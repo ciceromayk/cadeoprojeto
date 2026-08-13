@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CadêOProjeto — Gestão de projetos de engenharia para todos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Paleta Canteiro */
+    --ferrugem: #E54B1A;
+    --ferrugem-2: #C13B12;
+    --ferrugem-soft: #F9DCD0;
+    --tinta: #1A1714;
+    --tinta-2: #3A332C;
+    --tinta-3: #6B6359;
+    --papel: #F2EDE3;
+    --papel-2: #E8E2D4;
+    --papel-3: #DDD5C3;
+    --cal: #FBF8F2;
+    --anil: #1F3A8A;
+    --anil-soft: #D6DCEC;
+    --linha: rgba(26,23,20,0.10);
+    --linha-2: rgba(26,23,20,0.18);
+
+    --font-display: 'Space Grotesk', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: var(--font-display);
+    font-size: 16px;
+    line-height: 1.55;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* ============================ NAV ============================ */
+  nav.topnav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 48px; height: 68px;
+    background: var(--papel);
+    border-bottom: 1px solid var(--tinta);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--tinta); }
+  .nav-logo .mark { width: 22px; height: 28px; color: var(--ferrugem); }
+  .nav-logo .wordmark {
+    font-family: var(--font-display); font-weight: 500; font-size: 18px;
+    letter-spacing: -0.02em; line-height: 1;
+  }
+  .nav-logo .wordmark b { font-weight: 700; }
+  .nav-logo .wordmark .q { color: var(--ferrugem); font-weight: 600; }
+
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-links a {
+    color: var(--tinta-2); text-decoration: none; font-size: 14px; font-weight: 400;
+    letter-spacing: -0.005em; transition: color 0.12s;
+  }
+  .nav-links a:hover { color: var(--ferrugem); }
+
+  /* ============================ BUTTONS ============================ */
+  .btn {
+    font-family: var(--font-display); font-weight: 500; font-size: 15px;
+    letter-spacing: -0.005em; padding: 12px 20px;
+    background: var(--ferrugem); color: var(--cal);
+    border: 1px solid var(--ferrugem); cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 8px; line-height: 1.2;
+    transition: all 0.12s;
+  }
+  .btn:hover { background: var(--ferrugem-2); border-color: var(--ferrugem-2); }
+  .btn.secondary { background: transparent; color: var(--tinta); border-color: var(--tinta); }
+  .btn.secondary:hover { background: var(--tinta); color: var(--papel); }
+  .btn.large { padding: 16px 28px; font-size: 16px; }
+  .btn.small { padding: 8px 14px; font-size: 13px; }
+
+  /* ============================ SECTIONS ============================ */
+  section { position: relative; z-index: 1; }
+  .container { max-width: 1280px; margin: 0 auto; padding: 0 48px; }
+
+  .section-tag {
+    font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--tinta-3);
+    display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px;
+  }
+  .section-tag .num {
+    background: var(--tinta); color: var(--papel);
+    padding: 3px 8px; letter-spacing: 0.06em;
+  }
+  .block-title {
+    font-size: clamp(38px, 5vw, 56px);
+    font-weight: 500; line-height: 1.02; letter-spacing: -0.035em;
+    margin-bottom: 16px; max-width: 720px; text-wrap: balance;
+  }
+  .block-title .em { color: var(--ferrugem); font-style: normal; }
+  .block-sub {
+    font-size: 17px; line-height: 1.55; color: var(--tinta-2);
+    max-width: 540px; margin-bottom: 56px;
+  }
+
+  /* ============================ HERO ============================ */
+  .hero {
+    padding: 168px 48px 80px;
+    border-bottom: 1px solid var(--tinta);
+    text-align: center;
+  }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 12px;
+    border: 1px solid var(--linha-2);
+    padding: 8px 14px; margin-bottom: 32px;
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--tinta-3); text-transform: uppercase; letter-spacing: 0.14em;
+  }
+  .eyebrow .dot {
+    width: 6px; height: 6px; background: var(--ferrugem); border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--ferrugem-soft);
+  }
+  .eyebrow .sep { color: var(--linha-2); }
+  .eyebrow b { color: var(--tinta); font-weight: 500; }
+
+  .hero h1 {
+    font-size: clamp(48px, 7vw, 88px);
+    font-weight: 500; line-height: 0.94; letter-spacing: -0.04em;
+    max-width: 1100px; margin: 0 auto 28px; text-wrap: balance;
+  }
+  .hero h1 .em { color: var(--ferrugem); font-style: normal; }
+  .hero h1 .q { color: var(--ferrugem); }
+
+  .hero p.lead {
+    font-size: clamp(17px, 1.6vw, 20px); color: var(--tinta-2);
+    max-width: 600px; margin: 0 auto 40px; line-height: 1.5;
+  }
+
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .hero-actions .note {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--tinta-3); margin-left: 12px; letter-spacing: 0.04em;
+  }
+
+  .hero-meta {
+    margin-top: 64px; padding-top: 40px; border-top: 1px solid var(--linha-2);
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
+    max-width: 720px; margin-left: auto; margin-right: auto;
+  }
+  .hero-meta-item .val {
+    font-size: 32px; font-weight: 500; letter-spacing: -0.025em;
+    line-height: 1; color: var(--ferrugem); margin-bottom: 6px;
+  }
+  .hero-meta-item .val.with-unit { display: inline-flex; align-items: baseline; }
+  .hero-meta-item .val .unit { font-size: 18px; color: var(--tinta-3); margin-left: 2px; }
+  .hero-meta-item .lbl {
+    font-family: var(--font-mono); font-size: 10px;
+    color: var(--tinta-3); text-transform: uppercase; letter-spacing: 0.12em;
+  }
+
+  /* ============================ MOCKUP ============================ */
+  .mockup-wrap {
+    padding: 80px 48px 96px;
+    background: var(--papel);
+    border-bottom: 1px solid var(--tinta);
+    display: flex; justify-content: center;
+  }
+  .mockup {
+    width: 100%; max-width: 1180px;
+    background: var(--cal); border: 1px solid var(--tinta);
+    box-shadow: 20px 20px 0 var(--papel-3);
+    overflow: hidden;
+  }
+  .mockup-bar {
+    background: var(--papel-2); border-bottom: 1px solid var(--linha-2);
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--tinta-3);
+  }
+  .mockup-dots { display: flex; gap: 6px; }
+  .mockup-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--tinta-3); opacity: 0.35; }
+  .mockup-url {
+    margin-left: 8px; flex: 1; background: var(--papel); padding: 5px 12px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--tinta-3);
+    letter-spacing: 0.04em;
+    border: 1px solid var(--linha);
+  }
+  .mockup-meta { color: var(--tinta-3); }
+  .mockup-layout { display: grid; grid-template-columns: 220px 1fr; min-height: 480px; }
+  .mockup-sidebar {
+    background: var(--papel-2); border-right: 1px solid var(--linha-2);
+    padding: 20px 12px;
+  }
+  .mock-logo { display: flex; align-items: center; gap: 10px; padding: 4px 8px; margin-bottom: 24px; }
+  .mock-logo .mark { width: 16px; color: var(--ferrugem); }
+  .mock-name { font-family: var(--font-display); font-weight: 500; font-size: 15px; letter-spacing: -0.015em; }
+  .mock-name b { font-weight: 700; }
+  .mock-name .q { color: var(--ferrugem); }
+  .mock-section {
+    font-family: var(--font-mono); font-size: 10px; color: var(--tinta-3);
+    text-transform: uppercase; letter-spacing: 0.12em; padding: 12px 8px 6px;
+  }
+  .mock-item {
+    display: flex; align-items: center; gap: 10px; padding: 7px 8px;
+    font-size: 13px; color: var(--tinta-2); cursor: default;
+  }
+  .mock-item .ic { width: 12px; height: 12px; }
+  .mock-item .ic svg { width: 12px; height: 12px; stroke: var(--tinta-2); fill: none; stroke-width: 1.5; }
+  .mock-item.active {
+    background: var(--cal); color: var(--tinta); border-left: 2px solid var(--ferrugem); padding-left: 6px;
+  }
+  .mock-item.active .ic svg { stroke: var(--ferrugem); }
+  .mock-badge {
+    margin-left: auto; font-family: var(--font-mono); font-size: 10px;
+    color: var(--tinta-3); letter-spacing: 0.04em;
+  }
+  .mock-main { padding: 24px 28px; }
+  .mock-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .mock-crumbs {
+    font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--tinta-3);
+  }
+  .mock-crumbs b { color: var(--tinta); font-weight: 500; }
+  .mock-actions { display: flex; gap: 8px; }
+  .mock-btn {
+    padding: 6px 12px; background: var(--ferrugem); color: var(--cal);
+    font-size: 11px; font-weight: 500; letter-spacing: -0.005em;
+  }
+  .mock-btn.ghost { background: transparent; color: var(--tinta); border: 1px solid var(--tinta); }
+  .mock-btn.mono { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; background: var(--tinta); padding: 6px 10px; }
+  .mock-title { font-size: 26px; font-weight: 500; letter-spacing: -0.025em; margin: 12px 0 4px; }
+  .mock-sub { font-family: var(--font-mono); font-size: 11px; color: var(--tinta-3); margin-bottom: 20px; letter-spacing: 0.04em; }
+
+  .mock-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .mock-card {
+    border: 1px solid var(--linha-2); padding: 14px; background: var(--cal);
+  }
+  .mock-card.highlight { background: var(--tinta); color: var(--papel); border-color: var(--tinta); }
+  .mock-card .lbl {
+    font-family: var(--font-mono); font-size: 9px; color: var(--tinta-3);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px;
+  }
+  .mock-card.highlight .lbl { color: rgba(242,237,227,0.5); }
+  .mock-card .val { font-size: 24px; font-weight: 500; letter-spacing: -0.025em; line-height: 1; }
+  .mock-card .val .unit { font-size: 14px; color: var(--tinta-3); margin-left: 2px; }
+  .mock-card.highlight .val { color: var(--ferrugem); }
+  .mock-card .delta {
+    font-family: var(--font-mono); font-size: 10px; color: var(--ferrugem);
+    margin-top: 6px; letter-spacing: 0.04em;
+  }
+  .mock-card.highlight .delta { color: var(--ferrugem); }
+
+  .mock-gantt { border: 1px solid var(--linha-2); padding: 16px; }
+  .mock-gantt-head {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .mock-gantt-head h4 { font-size: 14px; font-weight: 500; letter-spacing: -0.01em; }
+  .mock-gantt-head .legend {
+    font-family: var(--font-mono); font-size: 10px; color: var(--tinta-3);
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .mock-gantt-row {
+    display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 12px;
+    padding: 5px 0; border-bottom: 1px solid var(--linha); font-size: 12px;
+  }
+  .mock-gantt-row:last-child { border-bottom: none; }
+  .mock-gantt-row .lbl { display: flex; align-items: center; gap: 6px; color: var(--tinta); }
+  .mock-gantt-row .lbl i { width: 3px; height: 12px; background: var(--tinta-3); display: inline-block; }
+  .mock-gantt-row .lbl i.r { background: var(--ferrugem); }
+  .mock-gantt-row .lbl i.a { background: var(--anil); }
+  .mock-gantt-track {
+    height: 14px; position: relative;
+    background: repeating-linear-gradient(90deg, transparent 0 39px, var(--linha) 39px 40px);
+  }
+  .mock-gantt-bar {
+    position: absolute; top: 2px; bottom: 2px;
+    background: var(--tinta); color: var(--papel);
+    font-family: var(--font-mono); font-size: 9px;
+    display: flex; align-items: center; padding: 0 6px; letter-spacing: 0.04em;
+  }
+  .mock-gantt-bar.r { background: var(--ferrugem); }
+  .mock-gantt-bar.a { background: var(--anil); }
+  .mock-gantt-bar.out { background: transparent; border: 1px solid var(--tinta); color: var(--tinta); }
+  .mock-gantt-bar.late { background: repeating-linear-gradient(45deg, var(--ferrugem) 0 4px, var(--ferrugem-2) 4px 8px); }
+
+  /* ============================ FEATURES ============================ */
+  .features { padding: 112px 48px; border-bottom: 1px solid var(--tinta); }
+  .features-grid {
+    display: grid; grid-template-columns: repeat(12, 1fr); gap: 0;
+    border-top: 1px solid var(--tinta); border-left: 1px solid var(--tinta);
+  }
+  .feature-card {
+    grid-column: span 4; padding: 32px;
+    border-right: 1px solid var(--tinta); border-bottom: 1px solid var(--tinta);
+    min-height: 280px;
+    display: flex; flex-direction: column;
+    background: var(--papel); transition: background 0.12s;
+    position: relative;
+  }
+  .feature-card.dark { background: var(--tinta); color: var(--papel); }
+  .feature-card.span-6 { grid-column: span 6; }
+  .feature-card.span-8 { grid-column: span 8; }
+  .feature-card:hover { background: var(--cal); }
+  .feature-card.dark:hover { background: var(--tinta-2); }
+  .feature-tag {
+    font-family: var(--font-mono); font-size: 11px;
+    color: var(--tinta-3); text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center;
+  }
+  .feature-card.dark .feature-tag { color: rgba(242,237,227,0.5); }
+  .feature-icon {
+    width: 44px; height: 44px; border: 1px solid var(--tinta);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 20px;
+  }
+  .feature-icon svg { width: 22px; height: 22px; stroke: var(--tinta); fill: none; stroke-width: 1.5; }
+  .feature-card.dark .feature-icon { border-color: var(--papel); }
+  .feature-card.dark .feature-icon svg { stroke: var(--papel); }
+  .feature-card h3 {
+    font-size: 22px; font-weight: 500; letter-spacing: -0.02em;
+    line-height: 1.2; margin-bottom: 12px;
+  }
+  .feature-card p {
+    font-size: 14px; line-height: 1.55; color: var(--tinta-2);
+  }
+  .feature-card.dark p { color: rgba(242,237,227,0.7); }
+
+  /* ============================ HOW ============================ */
+  .how { padding: 112px 48px; background: var(--papel-2); border-bottom: 1px solid var(--tinta); }
+  .steps {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border: 1px solid var(--tinta); background: var(--cal);
+  }
+  .step {
+    padding: 36px 28px; border-right: 1px solid var(--tinta);
+    display: flex; flex-direction: column; min-height: 320px;
+  }
+  .step:last-child { border-right: none; }
+  .step-num {
+    font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.12em; color: var(--tinta-3);
+    margin-bottom: 24px; display: flex; align-items: center; gap: 12px;
+  }
+  .step-num .n {
+    width: 28px; height: 28px; background: var(--ferrugem); color: var(--cal);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+  }
+  .step h3 {
+    font-size: 24px; font-weight: 500; letter-spacing: -0.025em;
+    line-height: 1.15; margin-bottom: 12px;
+  }
+  .step p { font-size: 14px; line-height: 1.5; color: var(--tinta-2); margin-bottom: 28px; }
+  .step-mono {
+    margin-top: auto; padding-top: 16px; border-top: 1px solid var(--linha-2);
+    font-family: var(--font-mono); font-size: 11px; color: var(--ferrugem);
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* ============================ MODULES ============================ */
+  .modules { padding: 112px 48px; border-bottom: 1px solid var(--tinta); }
+  .modules-list {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+  }
+  .module-item {
+    background: var(--cal); border: 1px solid var(--linha-2);
+    padding: 24px 28px;
+    display: grid; grid-template-columns: 40px 1fr auto; gap: 20px; align-items: start;
+    transition: border-color 0.12s;
+  }
+  .module-item:hover { border-color: var(--tinta); }
+  .module-icon {
+    width: 40px; height: 40px; border: 1px solid var(--tinta);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .module-icon svg { width: 18px; height: 18px; stroke: var(--tinta); fill: none; stroke-width: 1.5; }
+  .module-item h4 { font-size: 16px; font-weight: 500; letter-spacing: -0.015em; margin-bottom: 4px; }
+  .module-item p { font-size: 13px; color: var(--tinta-2); line-height: 1.5; }
+  .module-tag {
+    font-family: var(--font-mono); font-size: 10px; color: var(--tinta-3);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    border: 1px solid var(--linha-2); padding: 3px 8px;
+    align-self: start; white-space: nowrap;
+  }
+
+  /* ============================ TECH ============================ */
+  .tech {
+    padding: 112px 48px; background: var(--tinta); color: var(--papel);
+    border-bottom: 1px solid var(--tinta);
+  }
+  .tech .section-tag { color: rgba(242,237,227,0.6); }
+  .tech .section-tag .num { background: var(--papel); color: var(--tinta); }
+  .tech .block-title { color: var(--papel); }
+  .tech .block-sub { color: rgba(242,237,227,0.7); }
+
+  .tech-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 48px; align-items: start; }
+  .tech-text p { font-size: 16px; line-height: 1.6; color: rgba(242,237,227,0.85); margin-bottom: 24px; max-width: 520px; }
+  .tech-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tech-badge {
+    font-family: var(--font-mono); font-size: 11px; padding: 6px 12px;
+    border: 1px solid rgba(242,237,227,0.3); color: rgba(242,237,227,0.85);
+    letter-spacing: 0.06em;
+  }
+  .tech-badge.accent { border-color: var(--ferrugem); color: var(--ferrugem); }
+
+  .tech-card {
+    background: var(--papel); color: var(--tinta);
+    border: 1px solid var(--papel); padding: 32px;
+  }
+  .tech-card .price {
+    font-size: 80px; font-weight: 500; letter-spacing: -0.04em; line-height: 1;
+    color: var(--ferrugem); margin-bottom: 4px;
+  }
+  .tech-card .price .pct { font-size: 32px; }
+  .tech-card .price-label {
+    font-size: 18px; font-weight: 500; letter-spacing: -0.01em;
+    margin-bottom: 8px;
+  }
+  .tech-card .price-sub {
+    font-size: 13px; color: var(--tinta-3); line-height: 1.5;
+    margin-bottom: 28px; padding-bottom: 24px; border-bottom: 1px solid var(--linha-2);
+  }
+  .tech-card .checks { display: flex; flex-direction: column; gap: 14px; }
+  .tech-card .check {
+    display: flex; align-items: center; gap: 12px; font-size: 14px; color: var(--tinta);
+  }
+  .tech-card .check .ic {
+    width: 16px; height: 16px; flex-shrink: 0;
+    color: var(--ferrugem);
+  }
+
+  /* ============================ LGPD STRIP ============================ */
+  .lgpd-strip {
+    background: var(--papel-2); border-bottom: 1px solid var(--tinta);
+    padding: 28px 48px;
+  }
+  .lgpd-strip-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: grid; grid-template-columns: 40px 1fr auto; gap: 24px; align-items: center;
+  }
+  .lgpd-icon {
+    width: 40px; height: 40px; border: 1px solid var(--tinta);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lgpd-icon svg { width: 18px; height: 18px; stroke: var(--ferrugem); fill: none; stroke-width: 1.5; }
+  .lgpd-strip p { font-size: 14px; color: var(--tinta-2); line-height: 1.55; }
+  .lgpd-strip strong { color: var(--tinta); font-weight: 500; }
+  .lgpd-strip .ref {
+    font-family: var(--font-mono); font-size: 11px; color: var(--tinta-3);
+    text-transform: uppercase; letter-spacing: 0.1em; text-align: right;
+  }
+
+  /* ============================ CTA ============================ */
+  .cta-block {
+    padding: 144px 48px; background: var(--ferrugem); color: var(--cal);
+    border-bottom: 1px solid var(--tinta); position: relative; overflow: hidden;
+    text-align: center;
+  }
+  .cta-grid-bg {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .cta-corner {
+    position: absolute; width: 24px; height: 24px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .cta-corner.tl { top: 32px; left: 32px; border-right: none; border-bottom: none; }
+  .cta-corner.tr { top: 32px; right: 32px; border-left: none; border-bottom: none; }
+  .cta-corner.bl { bottom: 32px; left: 32px; border-right: none; border-top: none; }
+  .cta-corner.br { bottom: 32px; right: 32px; border-left: none; border-top: none; }
+  .cta-meta {
+    position: absolute; font-family: var(--font-mono); font-size: 10px;
+    color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.12em;
+  }
+  .cta-meta.tl { top: 32px; left: 72px; }
+  .cta-meta.tr { top: 32px; right: 72px; text-align: right; }
+  .cta-meta.bl { bottom: 32px; left: 72px; }
+  .cta-meta.br { bottom: 32px; right: 72px; text-align: right; }
+  .cta-inner { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; }
+  .cta-inner .eyebrow {
+    background: transparent; border-color: rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.85);
+  }
+  .cta-inner .eyebrow b { color: var(--cal); }
+  .cta-inner .eyebrow .dot { background: var(--cal); box-shadow: 0 0 0 3px rgba(255,255,255,0.25); }
+  .cta-inner h2 {
+    font-size: clamp(48px, 7vw, 96px);
+    font-weight: 500; line-height: 0.96; letter-spacing: -0.04em;
+    margin-bottom: 32px; text-wrap: balance;
+  }
+  .cta-inner h2 .q { color: var(--tinta); }
+  .cta-inner p { font-size: 19px; color: rgba(255,255,255,0.9); max-width: 540px; margin: 0 auto 48px; line-height: 1.5; }
+  .cta-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn.on-ferrugem { background: var(--tinta); color: var(--cal); border-color: var(--tinta); }
+  .btn.on-ferrugem:hover { background: var(--cal); color: var(--tinta); border-color: var(--cal); }
+  .btn.on-ferrugem.secondary { background: transparent; color: var(--cal); border-color: var(--cal); }
+  .btn.on-ferrugem.secondary:hover { background: var(--cal); color: var(--ferrugem); border-color: var(--cal); }
+
+  /* ============================ CONTACT ============================ */
+  .contact { padding: 112px 48px; border-bottom: 1px solid var(--tinta); background: var(--papel); }
+  .contact-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .contact-card {
+    background: var(--cal); border: 1px solid var(--linha-2);
+    padding: 32px; display: flex; flex-direction: column; gap: 12px;
+    text-decoration: none; color: inherit; transition: border-color 0.12s, background 0.12s;
+    min-height: 240px;
+  }
+  .contact-card:hover { border-color: var(--tinta); }
+  .contact-card .ic {
+    width: 40px; height: 40px; border: 1px solid var(--tinta);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 8px;
+  }
+  .contact-card .ic svg { width: 18px; height: 18px; stroke: var(--tinta); fill: none; stroke-width: 1.5; }
+  .contact-card h3 { font-size: 20px; font-weight: 500; letter-spacing: -0.015em; }
+  .contact-card p { font-size: 14px; color: var(--tinta-2); line-height: 1.5; flex: 1; }
+  .contact-value {
+    font-family: var(--font-mono); font-size: 14px; color: var(--ferrugem);
+    word-break: break-all; padding-top: 16px; border-top: 1px solid var(--linha);
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .contact-card:hover .contact-value { color: var(--ferrugem-2); }
+  .contact-value::after { content: '→'; transition: transform 0.12s; }
+  .contact-card:hover .contact-value::after { transform: translateX(3px); }
+
+  /* ============================ FOOTER ============================ */
+  footer {
+    background: var(--papel); padding: 80px 48px 40px;
+  }
+  .footer-inner { max-width: 1280px; margin: 0 auto; }
+  .footer-top {
+    display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 64px;
+    padding-bottom: 48px; margin-bottom: 32px;
+    border-bottom: 1px solid var(--linha-2);
+  }
+  .footer-brand .mark { width: 36px; color: var(--ferrugem); margin-bottom: 20px; }
+  .footer-brand h3 {
+    font-family: var(--font-display); font-size: 28px; font-weight: 500;
+    letter-spacing: -0.025em; margin-bottom: 12px;
+  }
+  .footer-brand h3 b { font-weight: 700; }
+  .footer-brand h3 .q { color: var(--ferrugem); }
+  .footer-brand p { font-size: 14px; color: var(--tinta-2); max-width: 280px; line-height: 1.55; margin-bottom: 20px; }
+  .footer-social { display: flex; gap: 8px; }
+  .social-btn {
+    width: 38px; height: 38px; border: 1px solid var(--tinta);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--tinta); text-decoration: none; transition: all 0.12s;
+  }
+  .social-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+  .social-btn:hover { background: var(--tinta); color: var(--papel); }
+  .footer-col h4 {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--tinta-3); margin-bottom: 20px;
+  }
+  .footer-col a, .footer-col span {
+    display: block; font-size: 14px; color: var(--tinta);
+    text-decoration: none; margin-bottom: 12px; transition: color 0.12s;
+  }
+  .footer-col a:hover { color: var(--ferrugem); }
+  .footer-col span { color: var(--tinta-2); cursor: default; }
+  .footer-bottom {
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+    font-family: var(--font-mono); font-size: 11px; color: var(--tinta-3); letter-spacing: 0.06em;
+  }
+  .footer-bottom .legal { display: flex; gap: 24px; }
+  .footer-bottom .legal a { color: var(--tinta-3); text-decoration: none; }
+  .footer-bottom .legal a:hover { color: var(--ferrugem); }
+
+  /* ============================ RESPONSIVE ============================ */
+  @media (max-width: 980px) {
+    nav.topnav { padding: 0 20px; }
+    .nav-links { display: none; }
+    .hero { padding: 128px 24px 64px; }
+    .hero-meta { grid-template-columns: repeat(2, 1fr); }
+    .mockup-wrap { padding: 40px 16px 64px; }
+    .mockup-layout { grid-template-columns: 1fr; }
+    .mockup-sidebar { display: none; }
+    .mock-cards { grid-template-columns: repeat(2, 1fr); }
+    .features-grid .feature-card { grid-column: span 12; }
+    .steps { grid-template-columns: 1fr; }
+    .step { border-right: none; border-bottom: 1px solid var(--tinta); }
+    .step:last-child { border-bottom: none; }
+    .modules-list { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr; }
+    .lgpd-strip-inner { grid-template-columns: 40px 1fr; }
+    .lgpd-strip .ref { display: none; }
+    .contact-grid { grid-template-columns: 1fr; }
+    .footer-top { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  /* ============================ SCROLL ANIM ============================ */
+  .fade-up { opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .fade-up.visible { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<!-- ============================ NAV ============================ -->
+<nav class="topnav">
+  <a href="#" class="nav-logo">
+    <svg class="mark" viewBox="0 0 100 132" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="square">
+      <path d="M 14 38 C 14 14, 36 4, 56 4 C 78 4, 90 18, 90 36 C 90 58, 64 64, 54 72 L 54 88"/>
+      <rect x="40" y="104" width="28" height="28" fill="currentColor" stroke="none"/>
+    </svg>
+    <span class="wordmark">Cadê<b>oProjeto</b><span class="q">?</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Funcionalidades</a>
+    <a href="#como-funciona">Como funciona</a>
+    <a href="#modulos">Módulos</a>
+    <a href="#tech">Tecnologia</a>
+    <a href="#contato">Contato</a>
+  </div>
+  <a href="app.html" class="btn small">Acessar plataforma</a>
+</nav>
+
+<!-- ============================ HERO ============================ -->
+<section class="hero">
+  <div class="eyebrow">
+    <span class="dot"></span>
+    <span>REV.06</span>
+    <span class="sep">·</span>
+    <span><b>Engineering Suite</b></span>
+    <span class="sep">·</span>
+    <span>Cloud</span>
+    <span class="sep">·</span>
+    <span>LGPD</span>
+  </div>
+  <h1>Gestão de projetos de<br/><span class="em">engenharia para todos</span><span class="q">.</span></h1>
+  <p class="lead">Do cronograma Gantt e Last Planner à curva S físico-financeira — tudo que sua equipe precisa para planejar, acompanhar e entregar projetos com rastreabilidade e controle.</p>
+  <div class="hero-actions">
+    <a href="app.html" class="btn large">Começar gratuitamente</a>
+    <a href="#features" class="btn secondary large">Ver funcionalidades</a>
+    <span class="note">grátis · sem cartão</span>
+  </div>
+  <div class="hero-meta">
+    <div class="hero-meta-item">
+      <div class="val with-unit">100<span class="unit">%</span></div>
+      <div class="lbl">Gratuito</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="val">NBR</div>
+      <div class="lbl">13531 / 13532</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="val">LGPD</div>
+      <div class="lbl">Compliant</div>
+    </div>
+    <div class="hero-meta-item">
+      <div class="val">CPM</div>
+      <div class="lbl">Caminho crítico</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ MOCKUP ============================ -->
+<div class="mockup-wrap fade-up">
+  <div class="mockup">
+    <div class="mockup-bar">
+      <div class="mockup-dots">
+        <span class="mockup-dot"></span><span class="mockup-dot"></span><span class="mockup-dot"></span>
+      </div>
+      <div class="mockup-url">cadeoprojeto.net / projeto / torre-sul / dashboard</div>
+      <span class="mockup-meta">REV.06 · ATIVO</span>
+    </div>
+    <div class="mockup-layout">
+      <aside class="mockup-sidebar">
+        <div class="mock-logo">
+          <svg class="mark" viewBox="0 0 100 132" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="square">
+            <path d="M 14 38 C 14 14, 36 4, 56 4 C 78 4, 90 18, 90 36 C 90 58, 64 64, 54 72 L 54 88"/>
+            <rect x="40" y="104" width="28" height="28" fill="currentColor" stroke="none"/>
+          </svg>
+          <span class="mock-name">Cadê<b>oProjeto</b><span class="q">?</span></span>
+        </div>
+
+        <div class="mock-section">Portfólio</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="6"/><path d="M 7 3 L 7 7 L 10 7"/></svg></span>Visão geral</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><circle cx="5" cy="5" r="2.5"/><path d="M 1 13 C 1 10, 9 10, 9 13"/></svg></span>Minha equipe</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="9" x2="8" y2="9"/></svg></span>Minhas tarefas <span class="mock-badge">4</span></div>
+
+        <div class="mock-section">Projeto</div>
+        <div class="mock-item active"><span class="ic"><svg viewBox="0 0 14 14"><rect x="1" y="1" width="5.5" height="5.5"/><rect x="7.5" y="1" width="5.5" height="5.5"/><rect x="1" y="7.5" width="5.5" height="5.5"/><rect x="7.5" y="7.5" width="5.5" height="5.5"/></svg></span>Dashboard</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><rect x="1" y="3" width="12" height="2"/><rect x="3" y="7" width="8" height="2"/><rect x="1" y="11" width="6" height="2"/></svg></span>Cronograma <span class="mock-badge">12</span></div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10"/><line x1="2" y1="6" x2="12" y2="6"/></svg></span>Tarefas <span class="mock-badge">7</span></div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><circle cx="5" cy="5" r="2.5"/><path d="M 1 13 C 1 10, 9 10, 9 13"/><circle cx="11" cy="6" r="2"/></svg></span>Equipe</div>
+
+        <div class="mock-section">Engenharia</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5"/><line x1="7" y1="1.5" x2="7" y2="12.5"/></svg></span>Disciplinas</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><rect x="3" y="1" width="8" height="12"/><line x1="5" y1="4" x2="9" y2="4"/><line x1="5" y1="7" x2="9" y2="7"/></svg></span>Entregáveis</div>
+        <div class="mock-item"><span class="ic"><svg viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12"/><line x1="1" y1="5" x2="13" y2="5"/><line x1="5" y1="1" x2="5" y2="13"/></svg></span>Matriz RACI</div>
+      </aside>
+
+      <main class="mock-main">
+        <div class="mock-header">
+          <span class="mock-crumbs">Projetos / <b>Edifício Torre Sul</b> / Dashboard</span>
+          <div class="mock-actions">
+            <span class="mock-btn mono">REV.06</span>
+            <span class="mock-btn ghost">Exportar</span>
+            <span class="mock-btn">+ Tarefa</span>
+          </div>
+        </div>
+        <h2 class="mock-title">Edifício Comercial Torre Sul</h2>
+        <div class="mock-sub">OBRA-2026-014 · 3.420 m² · 4 pavto. · entrega 22/11/2026</div>
+
+        <div class="mock-cards">
+          <div class="mock-card highlight">
+            <div class="lbl">Progresso geral</div>
+            <div class="val">73<span class="unit">%</span></div>
+            <div class="delta">↑ 4,2 pp · 7d</div>
+          </div>
+          <div class="mock-card">
+            <div class="lbl">Concluídas</div>
+            <div class="val">28<span class="unit">/42</span></div>
+          </div>
+          <div class="mock-card">
+            <div class="lbl">Atrasadas</div>
+            <div class="val" style="color: var(--ferrugem);">3</div>
+          </div>
+          <div class="mock-card">
+            <div class="lbl">CPM em risco</div>
+            <div class="val">12<span class="unit">d</span></div>
+          </div>
+        </div>
+
+        <div class="mock-gantt">
+          <div class="mock-gantt-head">
+            <h4>Cronograma · 12 semanas</h4>
+            <span class="legend">JUN — JUL — AGO</span>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i class="r"></i>Fundação</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar r" style="left: 0; width: 24%;">12d · OK</div></div>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i class="r"></i>Estrutura</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar r" style="left: 16%; width: 32%;">18d · R</div></div>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i></i>Hidráulica</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar" style="left: 30%; width: 22%;">9d</div></div>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i class="a"></i>Elétrica</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar a" style="left: 38%; width: 18%;">7d</div></div>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i></i>Acabamento</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar out" style="left: 60%; width: 28%;">14d · plan.</div></div>
+          </div>
+          <div class="mock-gantt-row">
+            <span class="lbl"><i class="r"></i>Aprov. prefeitura</span>
+            <div class="mock-gantt-track"><div class="mock-gantt-bar late" style="left: 4%; width: 14%;">atrasada · 6d</div></div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ FEATURES ============================ -->
+<section class="features" id="features">
+  <div class="container">
+    <div class="section-tag"><span class="num">01</span><span>Funcionalidades</span></div>
+    <h2 class="block-title">Tudo que um projeto de <span class="em">engenharia</span> exige.</h2>
+    <p class="block-sub">Do planejamento à entrega, com rastreabilidade completa e fluxo de aprovação profissional.</p>
+
+    <div class="features-grid fade-up">
+      <!-- Gantt -->
+      <div class="feature-card span-8 dark">
+        <div class="feature-tag"><span>01 · CRONOGRAMA</span><span>GANTT + CPM</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="3"/><rect x="6" y="11" width="14" height="3"/><rect x="2" y="17" width="10" height="3"/></svg>
+        </div>
+        <h3>Cronograma Gantt com caminho crítico.</h3>
+        <p>Dependências FS, SS, FF e SF com lag, marcos e linha de base. O cronograma recalcula datas e o caminho crítico automaticamente ao mover ou editar tarefas, com EAP em múltiplos níveis e previsão de término pelo ritmo real.</p>
+      </div>
+
+      <!-- RACI -->
+      <div class="feature-card">
+        <div class="feature-tag"><span>02 · RACI</span><span>R·A·C·I</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="8" y1="2" x2="8" y2="22"/></svg>
+        </div>
+        <h3>Matriz RACI.</h3>
+        <p>Defina claramente quem é Responsável, Aprovador, Consultado e Informado em cada entregável.</p>
+      </div>
+
+      <!-- Multi-visão -->
+      <div class="feature-card">
+        <div class="feature-tag"><span>03 · TAREFAS</span><span>KANBAN / TABELA</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="2" y="2" width="6" height="20"/><rect x="10" y="2" width="6" height="14"/><rect x="18" y="2" width="4" height="8"/></svg>
+        </div>
+        <h3>Tarefas em Kanban ou Tabela.</h3>
+        <p>Alterne entre quadro Kanban e tabela editável. Filtre por disciplina, setor, etiqueta e responsável, e comente com @menções.</p>
+      </div>
+
+      <!-- Last Planner -->
+      <div class="feature-card">
+        <div class="feature-tag"><span>04 · LAST PLANNER</span><span>%PPC</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><polyline points="8 14 11 17 16 12"/></svg>
+        </div>
+        <h3>Last Planner e %PPC.</h3>
+        <p>Planejamento semanal com Lookahead de 6 semanas, comprometimento só de tarefas livres de restrição, indicador %PPC e Pareto das causas de não-cumprimento.</p>
+      </div>
+
+      <!-- Curva S / Desembolso -->
+      <div class="feature-card">
+        <div class="feature-tag"><span>05 · FÍSICO-FINANCEIRO</span><span>CURVA S</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><polyline points="3 3 3 21 21 21"/><path d="M5 16 C 9 16, 10 8, 14 8 S 18 6, 20 5"/></svg>
+        </div>
+        <h3>Curva S e fluxo de desembolso.</h3>
+        <p>Avanço físico (previsto × realizado × linha de base) e fluxo de desembolso financeiro mês a mês, com KPIs de desvio e marcador de "hoje".</p>
+      </div>
+
+      <!-- Importação -->
+      <div class="feature-card span-6">
+        <div class="feature-tag"><span>06 · IMPORTAÇÃO</span><span>MS PROJECT / PREVISION</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <h3>Importe do MS Project e Prevision.</h3>
+        <p>Traga cronogramas prontos de XML (MS Project) e XLSX (Prevision) em lote — tarefas, dependências, marcos e EAP, mesmo em projetos grandes, sem retrabalho.</p>
+      </div>
+
+      <!-- Colaboração / Permissões -->
+      <div class="feature-card span-6">
+        <div class="feature-tag"><span>07 · COLABORAÇÃO</span><span>PAPÉIS &amp; PERMISSÕES</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <h3>Equipe com papéis e permissões.</h3>
+        <p>Convide por e-mail e defina o papel de cada um: administrador, editor, comentarista e visualizador (vê tudo, sem editar). Setores e disciplinas podem ser reaproveitados de uma obra para outra.</p>
+      </div>
+
+      <!-- NBR -->
+      <div class="feature-card span-6">
+        <div class="feature-tag"><span>08 · NBR 13531 / 13532</span><span>ABNT</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><path d="M 2 22 L 6 6 L 12 14 L 16 8 L 22 22"/><line x1="2" y1="22" x2="22" y2="22"/></svg>
+        </div>
+        <h3>Disciplinas alinhadas com a norma brasileira.</h3>
+        <p>Estrutura técnica baseada nas normas ABNT 13531/13532. Organize as disciplinas da equipe com papéis e visibilidades definidas — exatamente como o cliente espera.</p>
+      </div>
+
+      <!-- Relatórios / Pendências -->
+      <div class="feature-card span-6">
+        <div class="feature-tag"><span>09 · RELATÓRIOS</span><span>PENDÊNCIAS &amp; IMPRESSÃO</span></div>
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>Relatórios e pendências para impressão.</h3>
+        <p>Relatório executivo, de tarefas, cronograma, RACI e desembolso em papel timbrado e paginado. Lista consolidada de pendências e alertas de prazo antes que virem problema.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ HOW ============================ -->
+<section class="how" id="como-funciona">
+  <div class="container">
+    <div class="section-tag"><span class="num">02</span><span>Como Funciona</span></div>
+    <h2 class="block-title">Comece em <span class="em">minutos</span>.</h2>
+    <p class="block-sub">Sem instalação, sem configuração complicada. Basta criar sua conta e começar.</p>
+
+    <div class="steps fade-up">
+      <div class="step">
+        <div class="step-num"><span class="n">1</span><span>CADASTRO</span></div>
+        <h3>Crie sua conta.</h3>
+        <p>Acesse a plataforma e cadastre-se gratuitamente com nome e e-mail. Pronto, já é seu.</p>
+        <span class="step-mono">cadastro grátis</span>
+      </div>
+      <div class="step">
+        <div class="step-num"><span class="n">2</span><span>NOVO PROJETO</span></div>
+        <h3>Crie seu projeto.</h3>
+        <p>Dê um nome ao projeto, defina as datas e adicione as informações básicas da obra ou serviço.</p>
+        <span class="step-mono">+ novo projeto</span>
+      </div>
+      <div class="step">
+        <div class="step-num"><span class="n">3</span><span>EQUIPE</span></div>
+        <h3>Monte sua equipe.</h3>
+        <p>Convide colaboradores por e-mail e defina o papel de cada um dentro do projeto.</p>
+        <span class="step-mono">convidar membros</span>
+      </div>
+      <div class="step">
+        <div class="step-num"><span class="n">4</span><span>OPERAÇÃO</span></div>
+        <h3>Gerencie e entregue.</h3>
+        <p>Acompanhe tarefas, prazos e entregáveis em tempo real. Tudo em um só lugar.</p>
+        <span class="step-mono">dashboard ao vivo</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ MODULES ============================ -->
+<section class="modules" id="modulos">
+  <div class="container">
+    <div class="section-tag"><span class="num">03</span><span>Módulos</span></div>
+    <h2 class="block-title">Uma plataforma <span class="em">completa</span>.</h2>
+    <p class="block-sub">Todos os módulos incluídos, sem planos pagos ou limitações artificiais.</p>
+
+    <div class="modules-list fade-up">
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="9" height="9"/><rect x="13" y="2" width="9" height="9"/><rect x="2" y="13" width="9" height="9"/><rect x="13" y="13" width="9" height="9"/></svg></div>
+        <div><h4>Dashboard do projeto</h4><p>Visão consolidada de progresso, tarefas e alertas em tempo real.</p></div>
+        <span class="module-tag">Portfólio</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="3"/><rect x="6" y="11" width="14" height="3"/><rect x="2" y="17" width="10" height="3"/></svg></div>
+        <div><h4>Cronograma Gantt</h4><p>CPM, restrições ASAP/ALAP, dependências com lag e caminho crítico.</p></div>
+        <span class="module-tag">Projeto</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="6" height="20"/><rect x="10" y="2" width="6" height="14"/><rect x="18" y="2" width="4" height="8"/></svg></div>
+        <div><h4>Tarefas Kanban</h4><p>Visualização em colunas ou lista, com menções e filtros avançados.</p></div>
+        <span class="module-tag">Projeto</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M 2 21 C 2 16, 16 16, 16 21"/><circle cx="17" cy="9" r="2.5"/><path d="M 14 21 C 14 17, 22 17, 22 21"/></svg></div>
+        <div><h4>Gestão de equipe</h4><p>Cards de membros com papel, disciplina, estatísticas e permissões.</p></div>
+        <span class="module-tag">Projeto</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="22"/><path d="M 2 12 C 7 7, 17 7, 22 12"/><path d="M 2 12 C 7 17, 17 17, 22 12"/></svg></div>
+        <div><h4>Disciplinas técnicas</h4><p>ARQ, ELE, HID, MEC e mais — conforme NBR 13531/13532.</p></div>
+        <span class="module-tag">Engenharia</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="13" y2="15"/></svg></div>
+        <div><h4>Entregáveis</h4><p>Pranchas e documentos com revisões, formato e fluxo de aprovação.</p></div>
+        <span class="module-tag">Engenharia</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="8" y1="2" x2="8" y2="22"/></svg></div>
+        <div><h4>Matriz RACI</h4><p>Responsabilidades R/A/C/I por disciplina e entregável.</p></div>
+        <span class="module-tag">Engenharia</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><path d="M 6 9 C 6 5, 8 3, 12 3 C 16 3, 18 5, 18 9 L 18 14 L 20 17 L 4 17 L 6 14 Z"/><path d="M 10 20 C 10 21, 14 21, 14 20"/></svg></div>
+        <div><h4>Pendências</h4><p>Lista consolidada de itens abertos com filtros por projeto e disciplina.</p></div>
+        <span class="module-tag">Ferramentas</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20"/><line x1="7" y1="6" x2="17" y2="6"/><line x1="7" y1="10" x2="17" y2="10"/><line x1="7" y1="14" x2="14" y2="14"/><line x1="7" y1="18" x2="12" y2="18"/></svg></div>
+        <div><h4>Relatório de pendências</h4><p>Exportação em PDF com cabeçalho e rodapé profissional para impressão.</p></div>
+        <span class="module-tag">Ferramentas</span>
+      </div>
+      <div class="module-item">
+        <div class="module-icon"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><line x1="15" y1="15" x2="21" y2="21"/></svg></div>
+        <div><h4>Busca global</h4><p>Pesquise projetos, tarefas e entregáveis com atalho Ctrl+K.</p></div>
+        <span class="module-tag">Ferramentas</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ TECH ============================ -->
+<section class="tech" id="tech">
+  <div class="container">
+    <div class="section-tag"><span class="num">04</span><span>Segurança & Privacidade</span></div>
+    <div class="tech-grid">
+      <div class="tech-text fade-up">
+        <h2 class="block-title">Seus dados ficam <span class="em" style="color: var(--ferrugem);">com você</span>.</h2>
+        <p>O CadêOProjeto não armazena nada nos nossos servidores. Tudo fica salvo na sua própria conta — você tem controle total sobre as suas informações a qualquer momento.</p>
+        <div class="tech-badges">
+          <span class="tech-badge accent">Banco de dados próprio</span>
+          <span class="tech-badge accent">Dados seguros</span>
+          <span class="tech-badge">Privacidade garantida</span>
+          <span class="tech-badge">LGPD compliant</span>
+          <span class="tech-badge">Supabase</span>
+        </div>
+      </div>
+      <div class="tech-card fade-up">
+        <div class="price">100<span class="pct">%</span></div>
+        <div class="price-label">Gratuito</div>
+        <div class="price-sub">Sem mensalidade, sem plano pago, sem surpresas. Para sempre.</div>
+        <div class="checks">
+          <div class="check"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M 3 8 L 7 12 L 13 4"/></svg>Crie quantos projetos quiser</div>
+          <div class="check"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M 3 8 L 7 12 L 13 4"/></svg>Adicione toda a sua equipe</div>
+          <div class="check"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M 3 8 L 7 12 L 13 4"/></svg>Todos os módulos desbloqueados</div>
+          <div class="check"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M 3 8 L 7 12 L 13 4"/></svg>Seus dados protegidos e privados</div>
+          <div class="check"><svg class="ic" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M 3 8 L 7 12 L 13 4"/></svg>Suporte direto via plataforma</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ LGPD STRIP ============================ -->
+<div class="lgpd-strip">
+  <div class="lgpd-strip-inner">
+    <div class="lgpd-icon">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="8" width="12" height="9"/>
+        <path d="M 6 8 V 5 C 6 3, 7 2, 9 2 C 11 2, 12 3, 12 5 V 8"/>
+      </svg>
+    </div>
+    <p><strong>LGPD compliant.</strong> Coletamos apenas nome e e-mail, armazenados na infraestrutura Supabase da sua escolha. Você pode solicitar acesso, correção ou exclusão dos seus dados a qualquer momento — conforme Art. 18 da Lei 13.709/2018.</p>
+    <span class="ref">Lei nº 13.709/18</span>
+  </div>
+</div>
+
+<!-- ============================ CTA ============================ -->
+<section class="cta-block">
+  <div class="cta-corner tl"></div>
+  <div class="cta-corner tr"></div>
+  <div class="cta-corner bl"></div>
+  <div class="cta-corner br"></div>
+  <div class="cta-meta tl">CTA · 01 / 01</div>
+  <div class="cta-meta tr">cadeoprojeto.net</div>
+  <div class="cta-meta bl">grátis · sem cartão</div>
+  <div class="cta-meta br">para sempre</div>
+  <div class="cta-grid-bg"></div>
+  <div class="cta-inner">
+    <div class="eyebrow">
+      <span class="dot"></span>
+      <span>COMECE AGORA</span>
+      <span class="sep">·</span>
+      <span><b>100% gratuito</b></span>
+    </div>
+    <h2>Cadê o projeto<span class="q">?</span><br/>Aqui.</h2>
+    <p>Comece a usar gratuitamente. Sem cartão de crédito, sem limite de projetos, sem ligação de vendedor.</p>
+    <div class="cta-actions">
+      <a href="app.html" class="btn large on-ferrugem">Acessar plataforma</a>
+      <a href="#contato" class="btn large on-ferrugem secondary">Fale com a gente</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CONTACT ============================ -->
+<section class="contact" id="contato">
+  <div class="container">
+    <div class="section-tag"><span class="num">05</span><span>Contato</span></div>
+    <h2 class="block-title">Estamos aqui <span class="em">para ajudar</span>.</h2>
+    <p class="block-sub">Dúvidas, sugestões ou só dar um oi — escolha o canal que preferir.</p>
+
+    <div class="contact-grid fade-up">
+      <a href="/cdn-cgi/l/email-protection#f99a989d9c96898b96939c8d96b99a989d9c96898b96939c8d96d7979c8d" class="contact-card">
+        <div class="ic">
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="4" width="14" height="10"/>
+            <path d="M 2 4 L 9 10 L 16 4"/>
+          </svg>
+        </div>
+        <h3>E-mail</h3>
+        <p>Envie sua mensagem e respondemos o mais rápido possível.</p>
+        <div class="contact-value"><span class="__cf_email__" data-cfemail="7615171213190604191c1302193615171213190604191c13021958181302">[email&#160;protected]</span></div>
+      </a>
+
+      <a href="https://instagram.com/oprojetosumiu" target="_blank" rel="noopener" class="contact-card">
+        <div class="ic">
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="2" y="2" width="14" height="14" rx="3"/>
+            <circle cx="9" cy="9" r="3.5"/>
+            <circle cx="13.5" cy="4.5" r="0.8" fill="currentColor"/>
+          </svg>
+        </div>
+        <h3>Instagram</h3>
+        <p>Novidades, dicas e bastidores do CadêOProjeto.</p>
+        <div class="contact-value">@oprojetosumiu</div>
+      </a>
+
+      <a href="app.html" class="contact-card">
+        <div class="ic">
+          <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M 2 4 L 16 4 L 16 12 L 10 12 L 7 15 L 7 12 L 2 12 Z"/>
+          </svg>
+        </div>
+        <h3>Suporte na plataforma</h3>
+        <p>Já é usuário? Acesse a seção de suporte diretamente dentro do aplicativo.</p>
+        <div class="contact-value">Acessar plataforma</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FOOTER ============================ -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <svg class="mark" viewBox="0 0 100 132" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="square">
+          <path d="M 14 38 C 14 14, 36 4, 56 4 C 78 4, 90 18, 90 36 C 90 58, 64 64, 54 72 L 54 88"/>
+          <rect x="40" y="104" width="28" height="28" fill="currentColor" stroke="none"/>
+        </svg>
+        <h3>Cadê<b>oProjeto</b><span class="q">?</span></h3>
+        <p>Gestão de projetos de engenharia para todos. Simples, completo e gratuito.</p>
+        <div class="footer-social">
+          <a href="https://instagram.com/oprojetosumiu" target="_blank" rel="noopener" class="social-btn" title="Instagram">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="2" y="2" width="12" height="12" rx="2.5"/>
+              <circle cx="8" cy="8" r="3"/>
+              <circle cx="12" cy="4" r="0.6" fill="currentColor"/>
+            </svg>
+          </a>
+          <a href="/cdn-cgi/l/email-protection#87e4e6e3e2e8f7f5e8ede2f3e8c7e4e6e3e2e8f7f5e8ede2f3e8a9e9e2f3" class="social-btn" title="E-mail">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="1.5" y="3.5" width="13" height="9"/>
+              <path d="M 1.5 3.5 L 8 9 L 14.5 3.5"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <div class="footer-col">
+        <h4>Plataforma</h4>
+        <a href="#features">Funcionalidades</a>
+        <a href="#modulos">Módulos</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="app.html">Acessar</a>
+      </div>
+      <div class="footer-col">
+        <h4>Contato</h4>
+        <a href="/cdn-cgi/l/email-protection#53303237363c23213c3936273c13303237363c23213c3936273c7d3d3627">E-mail</a>
+        <a href="https://instagram.com/oprojetosumiu" target="_blank" rel="noopener">Instagram</a>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="app.html">Política de privacidade</a>
+        <a href="app.html">Termos de uso</a>
+        <span>LGPD compliant</span>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 CadêOProjeto · Todos os direitos reservados</span>
+      <div class="legal">
+        <a href="/cdn-cgi/l/email-protection#9bf8fafffef4ebe9f4f1feeff4dbf8fafffef4ebe9f4f1feeff4b5f5feef"><span class="__cf_email__" data-cfemail="01626065646e71736e6b64756e41626065646e71736e6b64756e2f6f6475">[email&#160;protected]</span></a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
