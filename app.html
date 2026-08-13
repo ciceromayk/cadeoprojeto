@@ -14019,7 +14019,7 @@ const UI = {
           <div class="hist-icon" style="background:${ic.bg};color:var(--ink-soft);">${ic.icon}</div>
           <div class="hist-body">
             <span class="hist-who">${escapeHtml(who)}</span>
-            <span class="hist-what"> alterou <strong>${fieldLabel}</strong></span>
+            <span class="hist-what"> alterou <strong>${escapeHtml(fieldLabel)}</strong></span>
             ${entry.old_val != null ? `<div class="hist-val" style="color:var(--accent-danger);text-decoration:line-through;margin-top:2px;">${escapeHtml(fmtVal(entry.old_val, entry.field))}</div>` : ''}
             <div class="hist-val" style="color:var(--accent-success);">${escapeHtml(fmtVal(entry.new_val, entry.field))}</div>
           </div>
