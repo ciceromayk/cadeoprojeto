@@ -10133,19 +10133,22 @@ const Views = {
   // Previsto + Realizado (custo × avanço).
   monthLbl(k) { const [y, m] = k.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''); },
 
-  // Mês de desembolso: se o término for até o dia 20, cai no mesmo mês; senão, no mês seguinte.
-  _dueMonth(d) {
+  // Data completa de desembolso: mesma data do término (dia ≤20) ou dia 05 do mês seguinte (dia >20).
+  _dueDate(d) {
     let [y, m, day] = d.split('-').map(Number);
-    if (day > 20) { m++; if (m > 12) { m = 1; y++; } }
-    return `${y}-${String(m).padStart(2, '0')}`;
+    if (day > 20) { m++; if (m > 12) { m = 1; y++; } day = 5; }
+    return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   },
+
+  // Mês de desembolso (agrupamento): derivado da data completa acima.
+  _dueMonth(d) { return this._dueDate(d).slice(0, 7); },
 
   // Agrega o desembolso mensal (reusado por view, CSV e relatório de impressão)
   _desembolsoData() {
     const leaves = State.tasks.filter(t => !t.inactive && !State.tasks.some(x => x.parent_id === t.id));
     const costed = leaves.filter(t => t.end_date && (parseFloat(t.cost) || 0) > 0);
     const totalCost = costed.reduce((a, t) => a + (parseFloat(t.cost) || 0), 0);
-    const curK = today().slice(0, 7);
+    const curD = today(), curK = curD.slice(0, 7);
     const dueMonth = d => this._dueMonth(d);
     if (!costed.length) return { leaves, costed, totalCost: 0, rows: [], curK };
     const keys = costed.map(t => dueMonth(t.end_date));
@@ -10156,10 +10159,10 @@ const Views = {
     const prevM = Object.fromEntries(months.map(k => [k, 0]));
     const realM = Object.fromEntries(months.map(k => [k, 0]));
     costed.forEach(t => {
-      const k = dueMonth(t.end_date), c = parseFloat(t.cost) || 0;
+      const dueD = this._dueDate(t.end_date), k = dueD.slice(0, 7), c = parseFloat(t.cost) || 0;
       prevM[k] += c;
-      // Realizado = custo × avanço, contabilizado só quando o mês de desembolso já chegou
-      if (k <= curK) realM[k] += c * Math.max(0, Math.min(100, parseFloat(t.progress) || 0)) / 100;
+      // Realizado = custo × avanço, contabilizado só quando a data exata de desembolso já chegou (respeita o dia 05)
+      if (dueD <= curD) realM[k] += c * Math.max(0, Math.min(100, parseFloat(t.progress) || 0)) / 100;
     });
     let accP = 0, accR = 0;
     const rows = months.map(k => {
