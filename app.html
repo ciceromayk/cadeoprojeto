@@ -3221,13 +3221,17 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.6.0';
 const CHANGELOG = [
-  { version: '4.5.0', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não alinhava as subtarefas quando a data ficava mais cedo', items: [
+  { version: '4.6.0', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não alinhava as subtarefas quando a data ficava mais cedo', items: [
     'Agendamento automático: quando uma tarefa-pai (fase) tem uma predecessora, as subtarefas sem predecessora própria agora ALINHAM exatamente ao início permitido por ela — nos dois sentidos. Antes, esse "portão" só empurrava a família para a FRENTE (predecessora atrasada); se a predecessora terminava ANTES de onde a família já estava agendada (dado legado nunca recalculado, ou predecessora que avançou), a família ficava parada na data antiga, abrindo um vão de folga que não deveria existir.',
     'A cadeia de predecessoras internas da fase (ex.: subtarefa 2 depende da 1, a 3 depende da 2...) continua sendo respeitada — só a(s) subtarefa(s) sem predecessora própria são realinhadas; o resto acompanha por propagação normal FS/SS/FF/SF, mantendo durações e vínculos.',
     'Subtarefas já em andamento (com progresso > 0, ou status Em Andamento/Concluída) continuam protegidas — o agendador nunca mexe em datas reais de tarefas iniciadas.',
     'Para projetos já existentes com esse desalinhamento, basta clicar em "Recalcular" (ou manter o recálculo automático do Gantt ligado) para a correção ser aplicada — não é preciso editar tarefa por tarefa.',
+  ] },
+  { version: '4.5.0', date: 'ago/2026', title: 'Correção: data do desembolso não seguia a regra dos dias 20/05', items: [
+    'Desembolso: corrigida a regra de qual mês recebe o custo de cada tarefa. Antes, TODA tarefa desembolsava no mês seguinte ao término, não importa o dia. Agora: término até o dia 20 → desembolso no MESMO mês da entrega; término após o dia 20 → desembolso cai no dia 05 do mês seguinte.',
+    'A correção vale para a view Desembolso, o modal "Preencher custos" (Curva S), o CSV exportado e o relatório impresso — todos usam a mesma regra centralizada.',
   ] },
   { version: '4.2.0', date: 'jul/2026', title: 'Tarefa-pai não pode mais ser marcada como marco', items: [
     'Modal de tarefa: o checkbox "◆ Marco" agora fica desabilitado para tarefas-pai (que têm subtarefas). Tarefa-pai tem datas de roll-up (um intervalo, calculado pelas filhas) — incompatível com marco (um ponto único no tempo). Dados assim já causaram cronograma incorreto: o motor de agendamento usa o início do "marco" como referência e ignora o intervalo real, empurrando sucessoras para a data errada.',
@@ -10150,18 +10154,29 @@ const Views = {
   },
 
   // ===== FLUXO DE DESEMBOLSO (financeiro) =====
-  // Modelo: custo de cada tarefa-folha desembolsado no MÊS SEGUINTE ao término
-  // (medição paga no mês seguinte). Previsto + Realizado (custo × avanço).
+  // Modelo: custo de cada tarefa-folha desembolsado conforme o dia de término —
+  // término até o dia 20 → desembolso no mesmo mês do término;
+  // término após o dia 20 → desembolso no mês seguinte (dia 05).
+  // Previsto + Realizado (custo × avanço).
   monthLbl(k) { const [y, m] = k.split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', ''); },
+
+  // Data completa de desembolso: mesma data do término (dia ≤20) ou dia 05 do mês seguinte (dia >20).
+  _dueDate(d) {
+    let [y, m, day] = d.split('-').map(Number);
+    if (day > 20) { m++; if (m > 12) { m = 1; y++; } day = 5; }
+    return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  },
+
+  // Mês de desembolso (agrupamento): derivado da data completa acima.
+  _dueMonth(d) { return this._dueDate(d).slice(0, 7); },
 
   // Agrega o desembolso mensal (reusado por view, CSV e relatório de impressão)
   _desembolsoData() {
     const leaves = State.tasks.filter(t => !t.inactive && !State.tasks.some(x => x.parent_id === t.id));
     const costed = leaves.filter(t => t.end_date && (parseFloat(t.cost) || 0) > 0);
     const totalCost = costed.reduce((a, t) => a + (parseFloat(t.cost) || 0), 0);
-    const curK = today().slice(0, 7);
-    // Mês de desembolso = mês SEGUINTE ao término
-    const dueMonth = d => { let [y, m] = d.slice(0, 7).split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
+    const curD = today(), curK = curD.slice(0, 7);
+    const dueMonth = d => this._dueMonth(d);
     if (!costed.length) return { leaves, costed, totalCost: 0, rows: [], curK };
     const keys = costed.map(t => dueMonth(t.end_date));
     const minK = keys.reduce((a, b) => a < b ? a : b), maxK = keys.reduce((a, b) => a > b ? a : b);
@@ -10171,10 +10186,10 @@ const Views = {
     const prevM = Object.fromEntries(months.map(k => [k, 0]));
     const realM = Object.fromEntries(months.map(k => [k, 0]));
     costed.forEach(t => {
-      const k = dueMonth(t.end_date), c = parseFloat(t.cost) || 0;
+      const dueD = this._dueDate(t.end_date), k = dueD.slice(0, 7), c = parseFloat(t.cost) || 0;
       prevM[k] += c;
-      // Realizado = custo × avanço, contabilizado só quando o mês de desembolso já chegou
-      if (k <= curK) realM[k] += c * Math.max(0, Math.min(100, parseFloat(t.progress) || 0)) / 100;
+      // Realizado = custo × avanço, contabilizado só quando a data exata de desembolso já chegou (respeita o dia 05)
+      if (dueD <= curD) realM[k] += c * Math.max(0, Math.min(100, parseFloat(t.progress) || 0)) / 100;
     });
     let accP = 0, accR = 0;
     const rows = months.map(k => {
@@ -10340,7 +10355,7 @@ const Views = {
         <div>
           <div class="page-eyebrow">FINANCEIRO · DESEMBOLSO</div>
           <div class="page-title" style="margin-bottom:4px;">Fluxo de Desembolso</div>
-          <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-mute);">Medição: custo desembolsado no mês seguinte ao término · ${escapeHtml(p.name)}</div>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-mute);">Medição: término até dia 20 desembolsa no mesmo mês; após o dia 20, no dia 05 do mês seguinte · ${escapeHtml(p.name)}</div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           ${DB.iCanEdit() ? `<button class="btn btn-cta" data-action="desembolso-open" style="font-size:11px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Preencher custos</button>` : ''}
@@ -10352,7 +10367,7 @@ const Views = {
     if (costed.length === 0) {
       return header + `<div class="panel"><div class="panel-body"><div class="empty-state" style="padding:40px 20px;">
         <div class="empty-state-title">Nenhum custo lançado</div>
-        <div class="empty-state-sub">Abra uma tarefa e preencha o campo <strong>Custo previsto (R$)</strong>. O desembolso é alocado no <strong>mês seguinte ao término</strong> de cada tarefa.</div>
+        <div class="empty-state-sub">Abra uma tarefa e preencha o campo <strong>Custo previsto (R$)</strong>. Término até o dia 20 desembolsa <strong>no mesmo mês</strong>; após o dia 20, o desembolso cai no <strong>dia 05 do mês seguinte</strong>.</div>
       </div></div></div>`;
     }
 
@@ -10364,8 +10379,8 @@ const Views = {
     const pastRows = rows.filter(r => r.isPast);
     const realToday = pastRows.length ? pastRows[pastRows.length - 1].accR : 0;
 
-    // Pré-computa as tarefas de cada mês (mês seguinte ao término)
-    const dueMonthOf = d => { let [y, m] = d.slice(0, 7).split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
+    // Pré-computa as tarefas de cada mês (término até dia 20 = mesmo mês; após, mês seguinte)
+    const dueMonthOf = d => this._dueMonth(d);
     const tasksByMonth = {};
     costed.forEach(t => { const k = dueMonthOf(t.end_date); if (!tasksByMonth[k]) tasksByMonth[k] = []; tasksByMonth[k].push(t); });
 
@@ -19970,7 +19985,7 @@ const UI = {
     if (!D.rows.length) { toast('Nenhum custo lançado nas tarefas', 'warning'); return; }
     const { rows, totalCost, curK, costed } = D;
     const monthLbl = k => Views.monthLbl(k);
-    const dueMonth = d => { let [y, m] = d.slice(0, 7).split('-').map(Number); m++; if (m > 12) { m = 1; y++; } return `${y}-${String(m).padStart(2, '0')}`; };
+    const dueMonth = d => Views._dueMonth(d);
     const tasksByMonth = {};
     costed.forEach(t => { const k = dueMonth(t.end_date); if (!tasksByMonth[k]) tasksByMonth[k] = []; tasksByMonth[k].push(t); });
     const pastRows = rows.filter(r => r.isPast);
@@ -20021,7 +20036,7 @@ const UI = {
     const body = `
       <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:10px;">
         <div style="flex:1;"><h2 style="margin:0 0 4px 0;">${escapeHtml(p.name)}</h2>
-          <div style="font-size:10px;color:#666;">Fluxo de Desembolso · medição (mês seguinte ao término) · Emitido em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div></div>
+          <div style="font-size:10px;color:#666;">Fluxo de Desembolso · medição (até dia 20: mesmo mês; após dia 20: dia 05 do mês seguinte) · Emitido em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div></div>
         <div style="display:flex;gap:16px;font-family:monospace;font-size:11px;">
           ${kpiBox('custo total', fmtBRL(totalCost))}${kpiBox('previsto até hoje', fmtBRL(prevToday))}${kpiBox('realizado até hoje', fmtBRL(realToday))}
         </div>
