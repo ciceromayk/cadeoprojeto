@@ -2997,17 +2997,16 @@ function autoSchedule(tasks, dependencies) {
   for (let iter = 0; iter < maxIter; iter++) {
     let changed = false;
     // Portão de início que cada tarefa-PAI impõe às filhas, vindo das predecessoras do pai.
-    //   _gateOf       → portão FORWARD: empurra as filhas p/ frente (comportamento histórico).
-    //   _pullStartOf  → ANTECIPAÇÃO: só com lag NEGATIVO o pai recua (overlap). As filhas SEM
-    //                   predecessora própria ALINHAM ao novo início (mais cedo) do pai.
+    // As filhas SEM predecessora própria ALINHAM exatamente a esse portão — pra frente
+    // (predecessora atrasou) ou pra trás (predecessora terminou antes do que a família estava
+    // agendada, ex.: dado legado nunca recalculado) — mantendo suas durações e predecessoras
+    // internas entre si (o resto da cadeia acompanha via propagação normal FS/SS/FF/SF).
     const _gateOf = new Map();
-    const _pullStartOf = new Map();
     for (const pid of _isParent) {
       const gpreds = predsBy.get(pid) || [];
       if (!gpreds.length) continue;
       const pn = nodes.get(pid);
       let gate = -Infinity;
-      let earliestPull = Infinity;   // menor (mais cedo) início forçado por lag NEGATIVO
       for (const p of gpreds) {
         const pred = nodes.get(p.predId); if (!pred) continue;
         let c;
@@ -3018,25 +3017,18 @@ function autoSchedule(tasks, dependencies) {
           // FS (TI): sucessora começa 1 dia útil APÓS o término (lag>=0). Negativo = overlap.
           default:   c = lagDayOf(pred.ef, p.lag >= 0 ? p.lag + 1 : p.lag); break;
         }
+        // MAIOR entre as predecessoras do pai (CPM padrão): a fase só pode começar quando
+        // TODAS as suas predecessoras permitirem — mas esse valor pode ser antes OU depois
+        // de onde a família está hoje, e nos dois casos a família deve alinhar a ele.
         if (c > gate) gate = c;
-        // Só lag NEGATIVO habilita o pai recuar para ANTES do planejado (antecipação/overlap).
-        if (p.lag < 0 && c < earliestPull) earliestPull = c;
       }
       if (gate > -Infinity) _gateOf.set(pid, gate);
-      // Registra antecipação só se o pai de fato recua (início forçado antes do planejado).
-      if (earliestPull < Infinity && earliestPull < pn.origStart) _pullStartOf.set(pid, earliestPull);
     }
     // Portão efetivo de uma tarefa = MAIOR portão entre seus ancestrais (fases aninhadas).
     const _effGate = (tid) => {
       let g = -Infinity, cur = _parentOf.get(tid), guard = 0;
       while (cur && guard++ < 50) { if (_gateOf.has(cur)) g = Math.max(g, _gateOf.get(cur)); cur = _parentOf.get(cur); }
       return g;
-    };
-    // Início antecipado efetivo = MENOR (mais cedo) início forçado entre os ancestrais.
-    const _effPullStart = (tid) => {
-      let s = Infinity, cur = _parentOf.get(tid), guard = 0;
-      while (cur && guard++ < 50) { if (_pullStartOf.has(cur)) s = Math.min(s, _pullStartOf.get(cur)); cur = _parentOf.get(cur); }
-      return s;
     };
     for (const t of tasks) {
       if (_isParent.has(t.id)) continue; // pai = roll-up das filhas (abaixo), não agenda por predecessora
@@ -3045,18 +3037,12 @@ function autoSchedule(tasks, dependencies) {
       // Sucessoras continuam usando as datas atuais dela (es/ef já setados no setup).
       if (node.started) continue;
       const preds = predsBy.get(t.id);
-      // Filha SEM predecessora própria herda o "portão" do pai (empurra só p/ frente).
-      // Filha COM predecessora segue a predecessora dela (laço abaixo).
+      // Filha SEM predecessora própria: alinha exatamente ao portão do pai/ancestral, se houver.
+      // Filha COM predecessora própria segue a predecessora dela (laço abaixo).
       let earliestStart;
       if (preds.length === 0) {
-        const _g  = _effGate(t.id);
-        const _ps = _effPullStart(t.id);
-        let s = node.origStart;
-        // Antecipação por lag negativo do pai: a filha ALINHA ao novo início (mais cedo) do pai.
-        if (_ps < s) s = _ps;
-        // Portão FORWARD vence se for mais tarde (lag positivo / predecessora atrasada) — histórico.
-        if (_g > -Infinity && _g > s) s = _g;
-        earliestStart = s;
+        const _g = _effGate(t.id);
+        earliestStart = _g > -Infinity ? _g : node.origStart;
       } else {
         earliestStart = -Infinity;
       }
@@ -3235,8 +3221,14 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.4.1';
+const APP_VERSION = '4.5.0';
 const CHANGELOG = [
+  { version: '4.5.0', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não alinhava as subtarefas quando a data ficava mais cedo', items: [
+    'Agendamento automático: quando uma tarefa-pai (fase) tem uma predecessora, as subtarefas sem predecessora própria agora ALINHAM exatamente ao início permitido por ela — nos dois sentidos. Antes, esse "portão" só empurrava a família para a FRENTE (predecessora atrasada); se a predecessora terminava ANTES de onde a família já estava agendada (dado legado nunca recalculado, ou predecessora que avançou), a família ficava parada na data antiga, abrindo um vão de folga que não deveria existir.',
+    'A cadeia de predecessoras internas da fase (ex.: subtarefa 2 depende da 1, a 3 depende da 2...) continua sendo respeitada — só a(s) subtarefa(s) sem predecessora própria são realinhadas; o resto acompanha por propagação normal FS/SS/FF/SF, mantendo durações e vínculos.',
+    'Subtarefas já em andamento (com progresso > 0, ou status Em Andamento/Concluída) continuam protegidas — o agendador nunca mexe em datas reais de tarefas iniciadas.',
+    'Para projetos já existentes com esse desalinhamento, basta clicar em "Recalcular" (ou manter o recálculo automático do Gantt ligado) para a correção ser aplicada — não é preciso editar tarefa por tarefa.',
+  ] },
   { version: '4.2.0', date: 'jul/2026', title: 'Tarefa-pai não pode mais ser marcada como marco', items: [
     'Modal de tarefa: o checkbox "◆ Marco" agora fica desabilitado para tarefas-pai (que têm subtarefas). Tarefa-pai tem datas de roll-up (um intervalo, calculado pelas filhas) — incompatível com marco (um ponto único no tempo). Dados assim já causaram cronograma incorreto: o motor de agendamento usa o início do "marco" como referência e ignora o intervalo real, empurrando sucessoras para a data errada.',
     'Saúde do Projeto: nova verificação "Tarefa-pai marcada como marco" (severidade alta) com correção de 1 clique, para detectar e corrigir tarefas que já tinham esse problema antes desta versão.',
