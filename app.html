@@ -2997,17 +2997,16 @@ function autoSchedule(tasks, dependencies) {
   for (let iter = 0; iter < maxIter; iter++) {
     let changed = false;
     // Portão de início que cada tarefa-PAI impõe às filhas, vindo das predecessoras do pai.
-    //   _gateOf       → portão FORWARD: empurra as filhas p/ frente (comportamento histórico).
-    //   _pullStartOf  → ANTECIPAÇÃO: só com lag NEGATIVO o pai recua (overlap). As filhas SEM
-    //                   predecessora própria ALINHAM ao novo início (mais cedo) do pai.
+    // As filhas SEM predecessora própria ALINHAM exatamente a esse portão — pra frente
+    // (predecessora atrasou) ou pra trás (predecessora terminou antes do que a família estava
+    // agendada, ex.: dado legado nunca recalculado) — mantendo suas durações e predecessoras
+    // internas entre si (o resto da cadeia acompanha via propagação normal FS/SS/FF/SF).
     const _gateOf = new Map();
-    const _pullStartOf = new Map();
     for (const pid of _isParent) {
       const gpreds = predsBy.get(pid) || [];
       if (!gpreds.length) continue;
       const pn = nodes.get(pid);
       let gate = -Infinity;
-      let earliestPull = Infinity;   // menor (mais cedo) início forçado por lag NEGATIVO
       for (const p of gpreds) {
         const pred = nodes.get(p.predId); if (!pred) continue;
         let c;
@@ -3018,25 +3017,18 @@ function autoSchedule(tasks, dependencies) {
           // FS (TI): sucessora começa 1 dia útil APÓS o término (lag>=0). Negativo = overlap.
           default:   c = lagDayOf(pred.ef, p.lag >= 0 ? p.lag + 1 : p.lag); break;
         }
+        // MAIOR entre as predecessoras do pai (CPM padrão): a fase só pode começar quando
+        // TODAS as suas predecessoras permitirem — mas esse valor pode ser antes OU depois
+        // de onde a família está hoje, e nos dois casos a família deve alinhar a ele.
         if (c > gate) gate = c;
-        // Só lag NEGATIVO habilita o pai recuar para ANTES do planejado (antecipação/overlap).
-        if (p.lag < 0 && c < earliestPull) earliestPull = c;
       }
       if (gate > -Infinity) _gateOf.set(pid, gate);
-      // Registra antecipação só se o pai de fato recua (início forçado antes do planejado).
-      if (earliestPull < Infinity && earliestPull < pn.origStart) _pullStartOf.set(pid, earliestPull);
     }
     // Portão efetivo de uma tarefa = MAIOR portão entre seus ancestrais (fases aninhadas).
     const _effGate = (tid) => {
       let g = -Infinity, cur = _parentOf.get(tid), guard = 0;
       while (cur && guard++ < 50) { if (_gateOf.has(cur)) g = Math.max(g, _gateOf.get(cur)); cur = _parentOf.get(cur); }
       return g;
-    };
-    // Início antecipado efetivo = MENOR (mais cedo) início forçado entre os ancestrais.
-    const _effPullStart = (tid) => {
-      let s = Infinity, cur = _parentOf.get(tid), guard = 0;
-      while (cur && guard++ < 50) { if (_pullStartOf.has(cur)) s = Math.min(s, _pullStartOf.get(cur)); cur = _parentOf.get(cur); }
-      return s;
     };
     for (const t of tasks) {
       if (_isParent.has(t.id)) continue; // pai = roll-up das filhas (abaixo), não agenda por predecessora
@@ -3045,18 +3037,12 @@ function autoSchedule(tasks, dependencies) {
       // Sucessoras continuam usando as datas atuais dela (es/ef já setados no setup).
       if (node.started) continue;
       const preds = predsBy.get(t.id);
-      // Filha SEM predecessora própria herda o "portão" do pai (empurra só p/ frente).
-      // Filha COM predecessora segue a predecessora dela (laço abaixo).
+      // Filha SEM predecessora própria: alinha exatamente ao portão do pai/ancestral, se houver.
+      // Filha COM predecessora própria segue a predecessora dela (laço abaixo).
       let earliestStart;
       if (preds.length === 0) {
-        const _g  = _effGate(t.id);
-        const _ps = _effPullStart(t.id);
-        let s = node.origStart;
-        // Antecipação por lag negativo do pai: a filha ALINHA ao novo início (mais cedo) do pai.
-        if (_ps < s) s = _ps;
-        // Portão FORWARD vence se for mais tarde (lag positivo / predecessora atrasada) — histórico.
-        if (_g > -Infinity && _g > s) s = _g;
-        earliestStart = s;
+        const _g = _effGate(t.id);
+        earliestStart = _g > -Infinity ? _g : node.origStart;
       } else {
         earliestStart = -Infinity;
       }
@@ -3235,8 +3221,14 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.5.0';
+const APP_VERSION = '4.6.0';
 const CHANGELOG = [
+  { version: '4.6.0', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não alinhava as subtarefas quando a data ficava mais cedo', items: [
+    'Agendamento automático: quando uma tarefa-pai (fase) tem uma predecessora, as subtarefas sem predecessora própria agora ALINHAM exatamente ao início permitido por ela — nos dois sentidos. Antes, esse "portão" só empurrava a família para a FRENTE (predecessora atrasada); se a predecessora terminava ANTES de onde a família já estava agendada (dado legado nunca recalculado, ou predecessora que avançou), a família ficava parada na data antiga, abrindo um vão de folga que não deveria existir.',
+    'A cadeia de predecessoras internas da fase (ex.: subtarefa 2 depende da 1, a 3 depende da 2...) continua sendo respeitada — só a(s) subtarefa(s) sem predecessora própria são realinhadas; o resto acompanha por propagação normal FS/SS/FF/SF, mantendo durações e vínculos.',
+    'Subtarefas já em andamento (com progresso > 0, ou status Em Andamento/Concluída) continuam protegidas — o agendador nunca mexe em datas reais de tarefas iniciadas.',
+    'Para projetos já existentes com esse desalinhamento, basta clicar em "Recalcular" (ou manter o recálculo automático do Gantt ligado) para a correção ser aplicada — não é preciso editar tarefa por tarefa.',
+  ] },
   { version: '4.5.0', date: 'ago/2026', title: 'Correção: data do desembolso não seguia a regra dos dias 20/05', items: [
     'Desembolso: corrigida a regra de qual mês recebe o custo de cada tarefa. Antes, TODA tarefa desembolsava no mês seguinte ao término, não importa o dia. Agora: término até o dia 20 → desembolso no MESMO mês da entrega; término após o dia 20 → desembolso cai no dia 05 do mês seguinte.',
     'A correção vale para a view Desembolso, o modal "Preencher custos" (Curva S), o CSV exportado e o relatório impresso — todos usam a mesma regra centralizada.',
@@ -3693,7 +3685,7 @@ const State = {
   restrictions: [],// restrições/impedimentos do projeto atual
   weeklyCommitments: [], // Last Planner — compromissos semanais do projeto atual
   lpWeekStart: null,     // segunda-feira da semana visível no Last Planner
-  raci: [],        // atribuições RACI (por restrição)
+  raci: [],        // atribuições RACI (por tarefa)
   labels: [],      // etiquetas do projeto atual — máx 15
   taskLabels: [],  // associações tarefa↔label do projeto atual
   comments: [],    // comentários da tarefa aberta no momento (carregados sob demanda)
@@ -3725,7 +3717,7 @@ const State = {
   situacaoBasis: 'baseline',  // 'baseline' (linha de base vigente) | 'planned' (datas planejadas atuais)
   ganttFullWidth: false,     // true = colapsa o painel de colunas p/ ampliar o gráfico
   ganttChartVisible: false,  // false = só tabela (padrão); true = exibe o gráfico Gantt
-  ganttAutoRecalc: (() => { try { return localStorage.getItem('projetudo_gantt_auto_recalc') === '1'; } catch (e) { return false; } })(), // recálculo automático ao mudar datas/deps
+  ganttAutoRecalc: (() => { try { const v = localStorage.getItem('projetudo_gantt_auto_recalc'); return v === null ? true : v === '1'; } catch (e) { return true; } })(), // recálculo automático ao mudar datas/deps — ligado por padrão; respeita escolha explícita salva
   ganttCollapsed: new Set(), // IDs de tarefas pai colapsadas
   collapsedPanels: new Set(), // painéis colapsáveis fechados (visão geral / relatórios)
   realtimeChannel: null,
@@ -4876,35 +4868,70 @@ const DB = {
     if (error) throw error;
   },
 
-  // ===== RACI (restrições) =====
+  // ===== RACI (tarefas) =====
   async listRaci(projectId) {
-    // raci_assignments.deliverable_id agora armazena restriction_id
-    const { data: rests, error: e1 } = await State.supabase
-      .from('restrictions').select('id').eq('project_id', projectId);
+    // raci_assignments.deliverable_id agora armazena task_id (antes armazenava restriction_id)
+    const { data: tks, error: e1 } = await State.supabase
+      .from('tasks').select('id').eq('project_id', projectId);
     if (e1) throw e1;
-    const ids = (rests || []).map(r => r.id);
-    if (ids.length === 0) return [];
-    const { data, error } = await State.supabase
-      .from('raci_assignments').select('*').in('deliverable_id', ids);
-    if (error) throw error;
-    return data || [];
+    const taskIds = (tks || []).map(t => t.id);
+
+    // Em lotes para não estourar o limite de itens do .in() (mesmo padrão de listAllTaskLabels)
+    const inBatches = async (ids) => {
+      const out = [];
+      for (let i = 0; i < ids.length; i += 500) {
+        const slice = ids.slice(i, i + 500);
+        const { data, error } = await State.supabase
+          .from('raci_assignments').select('*').in('deliverable_id', slice);
+        if (error) throw error;
+        if (data) out.push(...data);
+      }
+      return out;
+    };
+
+    const direct = taskIds.length ? await inBatches(taskIds) : [];
+
+    // Compatibilidade: projetos que tinham RACI atribuído no modelo antigo (por restrição)
+    // guardam deliverable_id = restriction_id. Remapeia via restrictions.task_id quando o
+    // vínculo existir, para não "sumir" com atribuições antigas. Best-effort: se a coluna
+    // task_id não existir no schema do projeto, apenas ignora (não quebra o carregamento).
+    try {
+      const { data: rests, error: e2 } = await State.supabase
+        .from('restrictions').select('id, task_id').eq('project_id', projectId);
+      if (e2) throw e2;
+      const linked = (rests || []).filter(r => r.task_id);
+      if (linked.length > 0) {
+        const legacy = await inBatches(linked.map(r => r.id));
+        if (legacy.length > 0) {
+          const taskByRestriction = new Map(linked.map(r => [r.id, r.task_id]));
+          const seen = new Set(direct.map(r => `${r.deliverable_id}|${r.member_id}|${r.role}`));
+          legacy.forEach(row => {
+            row.deliverable_id = taskByRestriction.get(row.deliverable_id);
+            const key = `${row.deliverable_id}|${row.member_id}|${row.role}`;
+            if (!seen.has(key)) { seen.add(key); direct.push(row); }
+          });
+        }
+      }
+    } catch (e) { console.warn('listRaci: compatibilidade com RACI legado (por restrição) não aplicada:', e.message); }
+
+    return direct;
   },
-  async setRaci(restrictionId, memberId, role) {
+  async setRaci(taskId, memberId, role) {
     const { data, error } = await State.supabase
       .from('raci_assignments')
-      .insert({ deliverable_id: restrictionId, member_id: memberId, role })
+      .insert({ deliverable_id: taskId, member_id: memberId, role })
       .select().single();
     if (error && error.code !== '23505') throw error;
     return data;
   },
-  async removeRaci(restrictionId, memberId, role) {
+  async removeRaci(taskId, memberId, role) {
     const { error } = await State.supabase.from('raci_assignments').delete()
-      .match({ deliverable_id: restrictionId, member_id: memberId, role });
+      .match({ deliverable_id: taskId, member_id: memberId, role });
     if (error) throw error;
   },
-  async clearRaciForRestriction(restrictionId) {
+  async clearRaciForTask(taskId) {
     const { error } = await State.supabase.from('raci_assignments').delete()
-      .eq('deliverable_id', restrictionId);
+      .eq('deliverable_id', taskId);
     if (error) throw error;
   },
 
@@ -4925,7 +4952,6 @@ const DB = {
     const tasks = await q('tasks', 'project_id', projectId);
     const taskIds = tasks.map(t => t.id);
     const restrictions = await q('restrictions', 'project_id', projectId);
-    const restIds = restrictions.map(r => r.id);
     const allocations = await q('project_allocations', 'project_id', projectId);
     const memberIds = new Set(allocations.map(a => a.team_member_id));
     tasks.forEach(t => { if (t.assignee_id) memberIds.add(t.assignee_id); });
@@ -4936,7 +4962,7 @@ const DB = {
       dependencies: await q('task_dependencies', 'task_id', taskIds, true),
       disciplines: await q('disciplines', 'project_id', projectId),
       restrictions,
-      raci: await q('raci_assignments', 'deliverable_id', restIds, true),
+      raci: await q('raci_assignments', 'deliverable_id', taskIds, true),
       labels: await q('labels', 'project_id', projectId),
       task_labels: await q('task_labels', 'task_id', taskIds, true),
       comments: await q('comments', 'task_id', taskIds, true),
@@ -5027,8 +5053,8 @@ const DB = {
 
     // 8) RACI
     for (const r of (pdata.raci || [])) {
-      if (restMap[r.deliverable_id] && memberExists(r.member_id)) {
-        try { await this.setRaci(restMap[r.deliverable_id], r.member_id, r.role); } catch (e) { console.warn('[import] RACI não aplicado:', e.message); }
+      if (taskMap[r.deliverable_id] && memberExists(r.member_id)) {
+        try { await this.setRaci(taskMap[r.deliverable_id], r.member_id, r.role); } catch (e) { console.warn('[import] RACI não aplicado:', e.message); }
       }
     }
 
@@ -5275,7 +5301,9 @@ const DB = {
       { title: 'Detalhamento elétrico', status: 'bloqueada', priority: 'alta', start_date: addDays(t, 15), end_date: addDays(t, 35), progress: 0, assignee_id: memberD.id },
       { title: 'Memorial de cálculo estrutural', status: 'a_fazer', priority: 'media', start_date: addDays(t, 28), end_date: addDays(t, 42), progress: 0, assignee_id: memberB.id },
     ];
-    for (const tk of seedTasks) await this.createTask(proj.id, tk);
+    const createdTasks = [];
+    for (const tk of seedTasks) createdTasks.push(await this.createTask(proj.id, tk));
+    const [taskAnteprojeto, taskPreDim, , taskMemDescr, taskEletrico] = createdTasks;
 
     // Disciplinas exemplo
     const discARQ = await this.createDiscipline(proj.id, { code: 'ARQ', name: 'Arquitetônico', lead_member_id: memberC.id });
@@ -5291,17 +5319,17 @@ const DB = {
     const r3 = await this.createRestriction(proj.id, { description: 'Definição do fornecedor de esquadrias — prazo de fabricação impacta cronograma', type: 'fornecedor', responsible_id: memberC.id, due_date: addDays(t, 10), status: 'pendente' });
     const r4 = await this.createRestriction(proj.id, { description: 'Compatibilização elétrica x arquitetura — conflito nos shafts do pavimento tipo', type: 'projeto', responsible_id: memberD.id, due_date: addDays(t, -2), status: 'em_tratamento', notes: 'Reunião de compatibilização agendada.' });
 
-    // RACI exemplo
-    await this.setRaci(r1.id, memberA.id, 'A');
-    await this.setRaci(r1.id, memberC.id, 'R');
-    await this.setRaci(r1.id, memberB.id, 'C');
-    await this.setRaci(r2.id, memberA.id, 'R');
-    await this.setRaci(r2.id, memberA.id, 'A');
-    await this.setRaci(r3.id, memberC.id, 'R');
-    await this.setRaci(r3.id, memberA.id, 'A');
-    await this.setRaci(r4.id, memberD.id, 'R');
-    await this.setRaci(r4.id, memberA.id, 'A');
-    await this.setRaci(r4.id, memberC.id, 'C');
+    // RACI exemplo — atribuições por tarefa (não por restrição)
+    await this.setRaci(taskPreDim.id, memberA.id, 'A');
+    await this.setRaci(taskPreDim.id, memberC.id, 'R');
+    await this.setRaci(taskPreDim.id, memberB.id, 'C');
+    await this.setRaci(taskAnteprojeto.id, memberA.id, 'R');
+    await this.setRaci(taskAnteprojeto.id, memberA.id, 'A');
+    await this.setRaci(taskMemDescr.id, memberC.id, 'R');
+    await this.setRaci(taskMemDescr.id, memberA.id, 'A');
+    await this.setRaci(taskEletrico.id, memberD.id, 'R');
+    await this.setRaci(taskEletrico.id, memberA.id, 'A');
+    await this.setRaci(taskEletrico.id, memberC.id, 'C');
 
     return proj;
   }
@@ -7796,7 +7824,7 @@ const Views = {
               <div>📋 Cronograma Gantt com caminho crítico</div>
               <div>🔗 Predecessoras (TI/II/TT/IT) com defasagem</div>
               <div>🎯 Restrições de agendamento (MS Project)</div>
-              <div>👥 Matriz RACI por restrição</div>
+              <div>👥 Matriz RACI por tarefa</div>
               <div>📌 Linha de base (baseline)</div>
               <div>📊 Marcos (milestones)</div>
               <div>🔁 Import/Export MS Project XML</div>
@@ -9660,7 +9688,6 @@ const Views = {
     // ── Card de restrição ──────────────────────────────────────────────────────
     const restrictionCard = (r) => {
       const resp     = State.members.find(m => m.id === r.responsible_id);
-      const raciRows = State.raci.filter(x => x.deliverable_id === r.id);
       const isOverdue = r.status !== 'resolvida' && r.status !== 'cancelada' && r.due_date && r.due_date < t;
       const st       = RESTRICTION_STATUS[r.status] || { label: r.status, color: 'var(--ink-mute)' };
       const typeLabel = RESTRICTION_TYPES[r.type] || r.type;
@@ -9673,7 +9700,6 @@ const Views = {
             <span style="font-family:var(--font-mono);font-size:9px;background:var(--bg-deep);border:1px solid var(--border);padding:1px 6px;border-radius:2px;color:var(--ink-mute);">${typeLabel}</span>
             ${resp ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--ink-soft);display:inline-flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${escapeHtml(resp.name.split(' ')[0])}</span>` : ''}
             ${r.due_date ? `<span style="font-family:var(--font-mono);font-size:9px;color:${isOverdue ? 'var(--accent-danger)' : 'var(--ink-mute)'};font-weight:${isOverdue ? '700' : '400'};">${isOverdue ? '⚠ ' : ''}${fmtDate(r.due_date)}</span>` : ''}
-            ${raciRows.length > 0 ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--ink-mute);">RACI ${raciRows.length}</span>` : ''}
           </div>
           ${r.notes ? `<div style="margin-top:6px;font-size:11px;color:var(--ink-mute);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(r.notes)}</div>` : ''}
         </div>`;
@@ -9996,13 +10022,13 @@ const Views = {
     const p = this.current();
     if (!p) return this.emptyProject();
 
-    if (State.restrictions.length === 0) {
+    if (State.tasks.length === 0) {
       return `
         <div class="page-title-block"><div class="page-eyebrow">PROJETO · RACI</div><div class="page-title">Matriz RACI</div></div>
         <div class="empty-state" style="background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;">
-          <div class="empty-state-title">Cadastre restrições primeiro</div>
-          <div class="empty-state-sub">A matriz RACI define <strong>quem é Responsável, Aprovador, Consultado e Informado</strong> para cada restrição do projeto.</div>
-          <button class="btn btn-cta" data-action="goto-restrictions">Ir para Restrições</button>
+          <div class="empty-state-title">Cadastre tarefas primeiro</div>
+          <div class="empty-state-sub">A matriz RACI define <strong>quem é Responsável, Aprovador, Consultado e Informado</strong> para cada tarefa do projeto.</div>
+          <button class="btn btn-cta" data-action="goto-tasks">Ir para Tarefas</button>
         </div>
       `;
     }
@@ -10017,9 +10043,16 @@ const Views = {
       `;
     }
 
-    // Filtro por tipo de restrição
-    let rests = [...State.restrictions].filter(r => r.status !== 'cancelada');
-    if (State.filterDiscipline !== 'all') rests = rests.filter(r => r.type === State.filterDiscipline);
+    const tks = State.tasks.filter(t => !t.inactive);
+
+    // Índice deliverable_id → member_id → roles[], montado uma vez (evita filter() O(T×M×R) por célula)
+    const raciIdx = new Map();
+    State.raci.forEach(x => {
+      if (!raciIdx.has(x.deliverable_id)) raciIdx.set(x.deliverable_id, new Map());
+      const byMember = raciIdx.get(x.deliverable_id);
+      if (!byMember.has(x.member_id)) byMember.set(x.member_id, []);
+      byMember.get(x.member_id).push(x.role);
+    });
 
     return `
       <div class="page-title-block">
@@ -10036,12 +10069,7 @@ const Views = {
       </div>
 
       <div class="filter-bar">
-        <span class="filter-label">Tipo:</span>
-        <select id="fltDisciplineRaci">
-          <option value="all">Todos</option>
-          ${Object.entries(RESTRICTION_TYPES).map(([k, v]) => `<option value="${k}" ${State.filterDiscipline === k ? 'selected' : ''}>${v}</option>`).join('')}
-        </select>
-        <span class="filter-count">${rests.length} ${rests.length === 1 ? 'restrição' : 'restrições'} · ${State.members.length} ${State.members.length === 1 ? 'pessoa' : 'pessoas'}</span>
+        <span class="filter-count">${tks.length} ${tks.length === 1 ? 'tarefa' : 'tarefas'} · ${State.members.length} ${State.members.length === 1 ? 'pessoa' : 'pessoas'}</span>
       </div>
 
       <div class="panel" style="padding:0;">
@@ -10049,25 +10077,24 @@ const Views = {
           <table class="raci-table">
             <thead>
               <tr>
-                <th class="col-deliverable">Restrição</th>
+                <th class="col-deliverable">Tarefa</th>
                 ${State.members.map(m => `<th title="${escapeHtml(m.name)}"><div style="font-size:10px;line-height:1.2;">${escapeHtml(m.name.split(' ')[0])}</div><div style="font-size:9px;color:var(--ink-mute);font-weight:400;">${escapeHtml((m.role || '').slice(0, 16))}</div></th>`).join('')}
               </tr>
             </thead>
             <tbody>
-              ${rests.map(r => {
-                const st = RESTRICTION_STATUS[r.status] || { label: r.status, color: 'var(--ink-mute)' };
+              ${tks.map(t => {
+                const stLabel = STATUS_LABELS[t.status] || t.status;
                 return `
                   <tr>
                     <td class="col-deliverable">
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--accent);">${RESTRICTION_TYPES[r.type] || r.type}</div>
-                      <div style="font-size:13px;font-weight:600;margin-top:2px;line-height:1.3;">${escapeHtml(r.description)}</div>
-                      <span style="font-size:9px;font-weight:700;color:${st.color};">${st.label}</span>
+                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--accent);">${escapeHtml(t.code || '')}</div>
+                      <div style="font-size:13px;font-weight:600;margin-top:2px;line-height:1.3;">${escapeHtml(t.title)}</div>
+                      <span style="font-size:9px;font-weight:700;color:var(--ink-mute);">${escapeHtml(stLabel)}</span>
                     </td>
                     ${State.members.map(m => {
-                      const assigns = State.raci.filter(x => x.deliverable_id === r.id && x.member_id === m.id);
-                      const roles = assigns.map(a => a.role).sort();
+                      const roles = (raciIdx.get(t.id)?.get(m.id) || []).slice().sort();
                       return `
-                        <td class="raci-cell" data-action="toggle-raci" data-deliverable="${r.id}" data-member="${m.id}">
+                        <td class="raci-cell" data-action="toggle-raci" data-task="${t.id}" data-member="${m.id}">
                           ${roles.length > 0
                             ? roles.map(role => `<span class="raci-pill ${role}" title="${RACI_LABELS[role]}">${role}</span>`).join(' ')
                             : '<span class="raci-empty">·</span>'}
@@ -11938,7 +11965,7 @@ const UI = {
       disciplines: { label: 'Nova Disciplina', action: () => UI.openDisciplineModal(), cta: true },
       restrictions: { label: 'Nova Restrição', action: () => UI.openRestrictionModal(), cta: true },
       lastplanner: { label: 'Comprometer Tarefa', action: () => UI.openCommitPicker(), cta: true },
-      raci: { label: 'Nova Restrição', action: () => UI.openRestrictionModal(), cta: true },
+      raci: { label: 'Nova Tarefa', action: () => UI.openTaskModal(), cta: true },
       pendencias:  { label: 'Exportar CSV', action: () => UI.exportPendenciasCSV(), cta: false },
       calendario:  { label: 'Hoje', action: () => { State.calendarYear = new Date().getFullYear(); State.calendarMonth = new Date().getMonth(); UI.render(); }, cta: false },
       relatorio:   { label: 'Atualizar', action: () => UI.refreshOverview(true).then(() => UI.render()), cta: false },
@@ -12495,6 +12522,7 @@ const UI = {
       if (a === 'delete-discipline') this.deleteDiscipline(id);
       if (a === 'goto-disciplines') { State.currentView = 'disciplines'; this.setActiveNav('disciplines'); this.render(); }
       if (a === 'goto-restrictions') { State.currentView = 'restrictions'; this.setActiveNav('restrictions'); this.render(); }
+      if (a === 'goto-tasks') { State.currentView = 'tasks'; this.setActiveNav('tasks'); this.render(); }
       if (a === 'goto-health') { State.currentView = 'health'; this.setActiveNav('health'); this.render(); }
       if (a === 'new-restriction') this.openRestrictionModal();
       if (a === 'edit-restriction') this.openRestrictionModal(id);
@@ -12508,7 +12536,7 @@ const UI = {
       if (a === 'lp-commit')     this.lpCommitTask(btn.dataset.id, btn.dataset.week);
       if (a === 'lp-uncommit')   this.lpUncommit(id);
       if (a === 'lp-mark')       this.lpMark(id, btn.dataset.status);
-      if (a === 'toggle-raci') this.openRaciCellMenu(btn.dataset.deliverable, btn.dataset.member);
+      if (a === 'toggle-raci') this.openRaciCellMenu(btn.dataset.task, btn.dataset.member);
       if (a === 'auto-schedule') this.runAutoSchedule();
       if (a === 'set-baseline') this.setBaseline();
       if (a === 'edit-baseline') this.openBaselineEditor();
@@ -12578,8 +12606,6 @@ const UI = {
     // Filtros (deliverables, raci, approvals)
     const fltD = $('#fltDiscipline');
     if (fltD) fltD.onchange = (e) => { State.filterDiscipline = e.target.value; UI.render(); };
-    const fltDR = $('#fltDisciplineRaci');
-    if (fltDR) fltDR.onchange = (e) => { State.filterDiscipline = e.target.value; UI.render(); };
     const fltS = $('#fltStatus');
     if (fltS) fltS.onchange = (e) => { State.filterStatus = e.target.value; UI.render(); };
     const fltA = $('#fltApprover');
@@ -14034,7 +14060,7 @@ const UI = {
           <div class="hist-icon" style="background:${ic.bg};color:var(--ink-soft);">${ic.icon}</div>
           <div class="hist-body">
             <span class="hist-who">${escapeHtml(who)}</span>
-            <span class="hist-what"> alterou <strong>${fieldLabel}</strong></span>
+            <span class="hist-what"> alterou <strong>${escapeHtml(fieldLabel)}</strong></span>
             ${entry.old_val != null ? `<div class="hist-val" style="color:var(--accent-danger);text-decoration:line-through;margin-top:2px;">${escapeHtml(fmtVal(entry.old_val, entry.field))}</div>` : ''}
             <div class="hist-val" style="color:var(--accent-success);">${escapeHtml(fmtVal(entry.new_val, entry.field))}</div>
           </div>
@@ -17878,12 +17904,11 @@ const UI = {
   },
 
   async deleteRestriction(id) {
-    if (!await Dialog.confirm({ title: 'Excluir restrição', msg: 'Excluir esta restrição e todos os seus dados de RACI?\n\nA ação não pode ser desfeita.', confirmText: 'Excluir', danger: true })) return;
+    if (!await Dialog.confirm({ title: 'Excluir restrição', msg: 'Excluir esta restrição?\n\nA ação não pode ser desfeita.', confirmText: 'Excluir', danger: true })) return;
     try {
       setLoading(true);
       await DB.deleteRestriction(id);
       State.restrictions = State.restrictions.filter(r => r.id !== id);
-      State.raci = State.raci.filter(r => r.deliverable_id !== id);
       Modal.close();
       await UI.render();
       const ret = State._restReturnToTaskId; State._restReturnToTaskId = null;
@@ -17894,20 +17919,20 @@ const UI = {
   },
 
   // ===== RACI CELL TOGGLE =====
-  openRaciCellMenu(restrictionId, memberId) {
-    const r = State.restrictions.find(x => x.id === restrictionId);
+  openRaciCellMenu(taskId, memberId) {
+    const t = State.tasks.find(x => x.id === taskId);
     const m = State.members.find(x => x.id === memberId);
-    if (!r || !m) return;
-    const current = State.raci.filter(x => x.deliverable_id === restrictionId && x.member_id === memberId).map(x => x.role);
+    if (!t || !m) return;
+    const current = State.raci.filter(x => x.deliverable_id === taskId && x.member_id === memberId).map(x => x.role);
 
     Modal.open({
       title: 'RACI · ' + m.name,
       body: `
         <div style="background:var(--bg-deep);padding:10px;border-radius:2px;margin-bottom:14px;font-size:12px;">
-          <div style="color:var(--ink-mute);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Restrição</div>
-          <div style="font-weight:600;margin-top:2px;line-height:1.4;">${escapeHtml(r.description)}</div>
+          <div style="color:var(--ink-mute);font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;">Tarefa</div>
+          <div style="font-weight:600;margin-top:2px;line-height:1.4;">${escapeHtml(t.title)}</div>
         </div>
-        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Selecione os papéis de <strong>${escapeHtml(m.name)}</strong> nesta restrição:</div>
+        <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">Selecione os papéis de <strong>${escapeHtml(m.name)}</strong> nesta tarefa:</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
           ${['R', 'A', 'C', 'I'].map(role => `
             <label style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--bg-deep);border-radius:2px;cursor:pointer;border:1px solid var(--border);">
@@ -17918,7 +17943,7 @@ const UI = {
           `).join('')}
         </div>
         <div style="font-size:11px;color:var(--ink-mute);margin-top:12px;font-family:var(--font-mono);">
-          ⓘ DICA: cada restrição deve ter 1 "A" (responsável pela decisão final).
+          ⓘ DICA: cada tarefa deve ter 1 "A" (responsável pela decisão final).
         </div>
       `,
       footer: `<button class="btn btn-secondary" id="btnCancelRaci">Cancelar</button><button class="btn btn-cta" id="btnSaveRaci">Salvar</button>`
@@ -17931,12 +17956,12 @@ const UI = {
       try {
         setLoading(true);
         for (const role of toAdd) {
-          const created = await DB.setRaci(restrictionId, memberId, role);
+          const created = await DB.setRaci(taskId, memberId, role);
           if (created) State.raci.push(created);
         }
         for (const role of toRemove) {
-          await DB.removeRaci(restrictionId, memberId, role);
-          State.raci = State.raci.filter(x => !(x.deliverable_id === restrictionId && x.member_id === memberId && x.role === role));
+          await DB.removeRaci(taskId, memberId, role);
+          State.raci = State.raci.filter(x => !(x.deliverable_id === taskId && x.member_id === memberId && x.role === role));
         }
         Modal.close();
         await UI.render();
@@ -20255,20 +20280,29 @@ const UI = {
   printRaci() {
     const p = Views.current();
     if (!p) { toast('Selecione um projeto', 'warning'); return; }
-    if (!State.restrictions.length) { toast('Nenhuma restrição cadastrada', 'warning'); return; }
-    const rests = State.restrictions.filter(r => r.status !== 'cancelada');
-    const mems  = State.members;
+    if (!State.tasks.length) { toast('Nenhuma tarefa cadastrada', 'warning'); return; }
+    const tks  = State.tasks.filter(t => !t.inactive);
+    const mems = State.members;
     const raciLabel = { R:'raci-r', A:'raci-a', C:'raci-c', I:'raci-i' };
 
-    const header = `<th style="min-width:220px;">Restrição</th>${mems.map(m=>`<th style="text-align:center;max-width:70px;word-break:break-word;">${escapeHtml(m.name.split(' ')[0])}<br><span style="font-weight:400;font-size:8px;color:#8a96a8;">${escapeHtml((m.role||'').slice(0,12))}</span></th>`).join('')}`;
-    const rows = rests.map(r => {
-      const st = RESTRICTION_STATUS[r.status];
+    // Índice deliverable_id → member_id → roles[], montado uma vez (evita filter() O(T×M×R) por célula)
+    const raciIdx = new Map();
+    State.raci.forEach(x => {
+      if (!raciIdx.has(x.deliverable_id)) raciIdx.set(x.deliverable_id, new Map());
+      const byMember = raciIdx.get(x.deliverable_id);
+      if (!byMember.has(x.member_id)) byMember.set(x.member_id, []);
+      byMember.get(x.member_id).push(x.role);
+    });
+
+    const header = `<th style="min-width:220px;">Tarefa</th>${mems.map(m=>`<th style="text-align:center;max-width:70px;word-break:break-word;">${escapeHtml(m.name.split(' ')[0])}<br><span style="font-weight:400;font-size:8px;color:#8a96a8;">${escapeHtml((m.role||'').slice(0,12))}</span></th>`).join('')}`;
+    const rows = tks.map(t => {
+      const stLabel = STATUS_LABELS[t.status] || t.status;
       const cells = mems.map(m => {
-        const roles = State.raci.filter(x => x.deliverable_id === r.id && x.member_id === m.id).map(x => x.role).sort();
+        const roles = (raciIdx.get(t.id)?.get(m.id) || []).slice().sort();
         return `<td class="raci-cell">${roles.map(role=>`<span class="badge ${raciLabel[role]||''}">${role}</span>`).join(' ')||'·'}</td>`;
       }).join('');
       return `<tr>
-        <td><span style="font-family:monospace;font-size:9px;color:#64748b;">${RESTRICTION_TYPES[r.type]||r.type}</span><br><strong style="font-size:11px;">${escapeHtml(r.description)}</strong><br><span style="font-size:8px;color:#94928B;">${st?.label||r.status}</span></td>
+        <td><span style="font-family:monospace;font-size:9px;color:#64748b;">${escapeHtml(t.code||'')}</span><br><strong style="font-size:11px;">${escapeHtml(t.title)}</strong><br><span style="font-size:8px;color:#94928B;">${escapeHtml(stLabel)}</span></td>
         ${cells}
       </tr>`;
     }).join('');
@@ -20281,7 +20315,7 @@ const UI = {
     </div>`;
 
     const body = `${legend}<table><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
-    this._printWindow('Matriz RACI · Restrições', body);
+    this._printWindow('Matriz RACI · Tarefas', body);
   },
 
   printDeps() {
