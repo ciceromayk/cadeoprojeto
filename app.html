@@ -3037,11 +3037,16 @@ function autoSchedule(tasks, dependencies) {
       // Sucessoras continuam usando as datas atuais dela (es/ef já setados no setup).
       if (node.started) continue;
       const preds = predsBy.get(t.id);
+      const _g = _effGate(t.id);
       // Filha SEM predecessora própria: alinha exatamente ao portão do pai/ancestral, se houver.
-      // Filha COM predecessora própria segue a predecessora dela (laço abaixo).
+      // Filha COM predecessora própria: segue a predecessora dela (laço abaixo), mas o portão
+      // da fase ainda vale como PISO — mesmo já tendo uma predecessora própria bem anterior,
+      // a filha não pode começar antes do que a predecessora DO PAI permite (a fase "prende"
+      // todas as suas subtarefas, não só a primeira). Se a predecessora própria empurrar a
+      // filha para DEPOIS do portão, essa data (mais tardia) continua valendo — é um MÁXIMO
+      // entre as duas restrições, como no CPM padrão.
       let earliestStart;
       if (preds.length === 0) {
-        const _g = _effGate(t.id);
         earliestStart = _g > -Infinity ? _g : node.origStart;
       } else {
         earliestStart = -Infinity;
@@ -3060,6 +3065,7 @@ function autoSchedule(tasks, dependencies) {
         if (constraint > earliestStart) earliestStart = constraint;
       }
       if (earliestStart === -Infinity) earliestStart = node.origStart;
+      if (preds.length > 0 && _g > -Infinity && _g > earliestStart) earliestStart = _g;
       // Restrições
       if (node.cdate != null) {
         if (node.ctype === 'SNET' && earliestStart < node.cdate) earliestStart = node.cdate;
@@ -3221,8 +3227,12 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.6.0';
+const APP_VERSION = '4.6.1';
 const CHANGELOG = [
+  { version: '4.6.1', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não vencia a predecessora própria de uma subtarefa', items: [
+    'Agendamento automático: o "portão" da fase (vindo da predecessora da tarefa-pai) agora também vale como PISO para subtarefas que JÁ TÊM predecessora própria — antes, só se aplicava a subtarefas sem predecessora. Ex.: se a subtarefa 1 de uma fase tem uma predecessora própria bem anterior, mas a fase inteira só pode começar mais tarde por causa da predecessora do pai, a subtarefa 1 agora começa junto com a fase (não mais na data antecipada que sua predecessora isolada permitiria).',
+    'Se a predecessora própria da subtarefa empurrar a data para DEPOIS do portão da fase, essa data mais tardia continua valendo — é sempre o máximo entre as duas restrições, como no CPM padrão; o portão nunca puxa a subtarefa pra ANTES do que sua própria predecessora exige.',
+  ] },
   { version: '4.6.0', date: 'set/2026', title: 'Correção: predecessora da tarefa-pai não alinhava as subtarefas quando a data ficava mais cedo', items: [
     'Agendamento automático: quando uma tarefa-pai (fase) tem uma predecessora, as subtarefas sem predecessora própria agora ALINHAM exatamente ao início permitido por ela — nos dois sentidos. Antes, esse "portão" só empurrava a família para a FRENTE (predecessora atrasada); se a predecessora terminava ANTES de onde a família já estava agendada (dado legado nunca recalculado, ou predecessora que avançou), a família ficava parada na data antiga, abrindo um vão de folga que não deveria existir.',
     'A cadeia de predecessoras internas da fase (ex.: subtarefa 2 depende da 1, a 3 depende da 2...) continua sendo respeitada — só a(s) subtarefa(s) sem predecessora própria são realinhadas; o resto acompanha por propagação normal FS/SS/FF/SF, mantendo durações e vínculos.',
