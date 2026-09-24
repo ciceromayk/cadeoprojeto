@@ -1,8 +1,11 @@
 -- Executar no SQL Editor do Supabase antes de publicar a versão 4.7.0.
 -- Pré-requisito: esquema do aplicativo existente (projects, tasks, project_shares).
--- Consulta prévia para códigos duplicados; resolva qualquer resultado antes de executar:
+-- Consulta prévia para códigos duplicados; a migração renumera somente as repetições:
 -- SELECT project_id, code, count(*) FROM public.tasks GROUP BY project_id, code HAVING count(*) > 1;
 BEGIN;
+
+-- Impede criação/edição de tarefas enquanto a numeração é saneada e indexada.
+LOCK TABLE public.tasks IN ACCESS EXCLUSIVE MODE;
 
 ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS next_task_number bigint;
 UPDATE public.projects p SET next_task_number = GREATEST(
@@ -12,6 +15,35 @@ UPDATE public.projects p SET next_task_number = GREATEST(
 );
 ALTER TABLE public.projects ALTER COLUMN next_task_number SET DEFAULT 1;
 ALTER TABLE public.projects ALTER COLUMN next_task_number SET NOT NULL;
+
+-- Preserva a primeira tarefa (created_at, id) de cada par (projeto, código).
+-- Reserva um código acima do maior T-NNN já usado para cada repetição adicional.
+-- IDs, predecessoras e demais relações da tarefa não são alterados.
+DO $repair$
+DECLARE
+  duplicate record;
+  reserved_number bigint;
+  replacement text;
+BEGIN
+  FOR duplicate IN
+    SELECT id, project_id, code FROM (
+      SELECT id, project_id, code,
+        row_number() OVER (PARTITION BY project_id, code ORDER BY created_at, id) AS occurrence
+      FROM public.tasks WHERE code IS NOT NULL
+    ) ranked
+    WHERE occurrence > 1
+    ORDER BY project_id, code, id
+  LOOP
+    UPDATE public.projects SET next_task_number = next_task_number + 1
+      WHERE id = duplicate.project_id
+      RETURNING next_task_number - 1 INTO reserved_number;
+    replacement := 'T-' || repeat('0', greatest(0, 3 - length(reserved_number::text))) || reserved_number::text;
+    UPDATE public.tasks SET code = replacement WHERE id = duplicate.id;
+    RAISE NOTICE 'Código de tarefa corrigido: projeto %, tarefa %, % -> %',
+      duplicate.project_id, duplicate.id, duplicate.code, replacement;
+  END LOOP;
+END;
+$repair$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS tasks_project_code_unique ON public.tasks(project_id, code);
 
