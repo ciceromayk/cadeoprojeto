@@ -3350,7 +3350,11 @@ const setLoading = on => $('#globalLoader').classList.toggle('active', on);
 // Converte erros técnicos do Supabase em mensagens legíveis
 function friendlyError(err) {
   const msg = err?.message || String(err || 'erro desconhecido');
-  if (msg.includes('duplicate key') || msg.includes('unique constraint') || msg.includes('already exists')) return 'Este registro já existe.';
+  if (msg.includes('duplicate key') || msg.includes('unique constraint') || msg.includes('already exists')) {
+    const _c = msg.match(/unique constraint "([^"]+)"/);
+    console.error('[erro de duplicidade]', err);
+    return 'Este registro já existe.' + (_c ? ` (${_c[1]})` : '');
+  }
   if (msg.includes('violates foreign key') || msg.includes('foreign key')) return 'Este item está em uso e não pode ser removido.';
   if (msg.includes('permission denied') || msg.includes('row-level security') || msg.includes('policy')) return 'Você não tem permissão para esta ação.';
   if (msg.includes('JWT') || msg.includes('token expired') || msg.includes('Invalid JWT')) return 'Sessão expirada — faça login novamente.';
@@ -3432,8 +3436,16 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.7.0';
+const APP_VERSION = '4.7.1';
 const CHANGELOG = [
+  { version: '4.7.1', date: 'nov/2026', title: 'Correção: erro "Este registro já existe" ao criar tarefa + novo visual', items: [
+    'Criar tarefa: corrigido o erro "Este registro já existe." — o código T-NNN agora é reservado no banco e, se houver conflito com um código já usado, o app reserva outro automaticamente.',
+    'Restauradas as proteções da 4.7.0 que haviam saído do app: bloqueio de dependências circulares, consultas paginadas e linhas de base salvas no banco.',
+    'Novo visual: cabeçalho do projeto com status e equipe, faixa de KPIs no Dashboard (Progresso, Próximo prazo e Prazo do projeto) e cores padronizadas nos relatórios.',
+    'Tarefas: novo modo "Lista" com grupos recolhíveis e agrupamento por Etapa (atividade pai).',
+    'Menu lateral: números só onde exige ação (Setores, Restrições, Saúde, Last Planner e Pendências); totais aparecem ao passar o mouse.',
+    'Dashboard: a data do "Próximo prazo" não aparece mais um dia antes.',
+  ] },
   { version: '4.7.0', date: 'set/2026', title: 'Integridade de cronograma e dados', items: [
     'Bloqueio de dependencias circulares, consultas paginadas, exportacao sem falhas silenciosas, historico de linhas de base no banco, codigos de tarefa reservados de forma atomica e calendario local consistente. Execute migrations/001-integrity.sql antes de publicar esta versao.',
   ] },
@@ -4400,24 +4412,32 @@ const DB = {
     return codes;
   },
 
+  // Conflito no índice único (project_id, code): o contador do banco ficou atrás de códigos já usados
+  // (ex.: tarefas criadas por versão antiga do app depois da migração). Nova reserva já avança o contador.
+  _isCodeConflict(err) {
+    return !!err && err.code === '23505' && /tasks_project_code_unique|\(project_id, code\)/i.test(`${err.message || ''} ${err.details || ''}`);
+  },
+
   async createTask(projectId, t) {
-    const [code] = await this.allocateTaskCodes(projectId, 1);
-    const payload = { project_id: projectId, ...t, code: t.code || code };
-    // order_index padrão (vai para o fim) se não foi informado — usa epoch (ms), bem acima do backfill
-    if (payload.order_index === undefined || payload.order_index === null) payload.order_index = Date.now();
-    const { data, error } = await State.supabase
-      .from('tasks').insert(payload).select().single();
-    if (error) {
+    for (let attempt = 0; ; attempt++) {
+      const [code] = await this.allocateTaskCodes(projectId, 1);
+      const payload = { project_id: projectId, ...t, code: t.code || code };
+      // order_index padrão (vai para o fim) se não foi informado — usa epoch (ms), bem acima do backfill
+      if (payload.order_index === undefined || payload.order_index === null) payload.order_index = Date.now();
+      let { data, error } = await State.supabase
+        .from('tasks').insert(payload).select().single();
       // fallback: se a coluna order_index ainda não existe (migration 27 não rodou)
-      if (/order_index|column/i.test(error.message || '')) {
+      if (error && /order_index|column/i.test(error.message || '')) {
         delete payload.order_index;
-        const retry = await State.supabase.from('tasks').insert(payload).select().single();
-        if (retry.error) throw retry.error;
-        return retry.data;
+        ({ data, error } = await State.supabase.from('tasks').insert(payload).select().single());
+      }
+      if (!error) return data;
+      if (this._isCodeConflict(error) && !t.code && attempt < 8) {
+        console.warn('[createTask] código', payload.code, 'já existe; reservando outro (tentativa', attempt + 1, ')');
+        continue;
       }
       throw error;
     }
-    return data;
   },
 
   async updateTask(id, patch) {
@@ -4483,14 +4503,7 @@ const DB = {
   // Gera códigos sequenciais T-XXX. Retorna o array criado (mesma ordem do payload).
   async createTasksBatch(projectId, tasksData) {
     if (!tasksData?.length) return [];
-    const codes = await this.allocateTaskCodes(projectId, tasksData.length);
     const epoch = Date.now();
-    const rows = tasksData.map((t, i) => ({
-      project_id: projectId,
-      order_index: epoch + i,
-      ...t,
-      code: t.code || codes[i],
-    }));
     // Estratégia de tentativa: lote completo; se falhar por coluna ausente,
     // strip do campo problemático e retentar (mesma resiliência do importer).
     const _try = async (payload) => {
@@ -4499,23 +4512,37 @@ const DB = {
       return data;
     };
     const optional = ['parent_id', 'baseline_start', 'baseline_end', 'cost', 'is_milestone', 'inactive', 'order_index', 'constraint_type', 'constraint_date'];
-    try {
-      const data = await _try(rows);
-      CPMCache.invalidate();
-      return data;
-    } catch (err) {
-      const msg = err.message || '';
-      const dropped = [];
-      for (const col of optional) {
-        if (msg.includes(col)) { rows.forEach(r => delete r[col]); dropped.push(col); }
-      }
-      if (dropped.length) {
-        console.warn('[createTasksBatch] removendo colunas ausentes no banco:', dropped.join(', '));
+    for (let attempt = 0; ; attempt++) {
+      const codes = await this.allocateTaskCodes(projectId, tasksData.length);
+      const rows = tasksData.map((t, i) => ({
+        project_id: projectId,
+        order_index: epoch + i,
+        ...t,
+        code: t.code || codes[i],
+      }));
+      try {
         const data = await _try(rows);
         CPMCache.invalidate();
         return data;
+      } catch (err) {
+        // Conflito de código: reserva novo bloco (o contador do banco avança a cada reserva)
+        if (this._isCodeConflict(err) && !tasksData.some(t => t.code) && attempt < 8) {
+          console.warn('[createTasksBatch] conflito de código; reservando novo bloco (tentativa', attempt + 1, ')');
+          continue;
+        }
+        const msg = err.message || '';
+        const dropped = [];
+        for (const col of optional) {
+          if (msg.includes(col)) { rows.forEach(r => delete r[col]); dropped.push(col); }
+        }
+        if (dropped.length) {
+          console.warn('[createTasksBatch] removendo colunas ausentes no banco:', dropped.join(', '));
+          const data = await _try(rows);
+          CPMCache.invalidate();
+          return data;
+        }
+        throw err;
       }
-      throw err;
     }
   },
 

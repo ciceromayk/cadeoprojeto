@@ -77,5 +77,8 @@ o site no Cloudflare Pages:
 4. No Supabase (**Authentication → URL Configuration**), adicione o domínio do
    Pages (e o domínio próprio, se houver) em *Site URL / Redirect URLs*.
 
-A migração SQL (`migrations/001-integrity.sql`) continua sendo executada
-manualmente no Supabase, **antes** de publicar uma versão que dependa dela.
+As migrações SQL (`migrations/001-integrity.sql`, depois `002-task-code-floor.sql`) continuam
+sendo executadas manualmente no Supabase, **antes** de publicar uma versão que dependa delas.
+
+A cada deploy com mudança para o usuário, siga a regra do [`CLAUDE.md`](CLAUDE.md): nova versão
+em `APP_VERSION`/`version.json` e entrada no topo de `CHANGELOG` (painel **Novidades**).

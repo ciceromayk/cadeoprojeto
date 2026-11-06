@@ -25,7 +25,7 @@ jobs:
           node-version: 22
       - name: Testes de integridade
         run: node --test tests/integrity.test.mjs
-      - name: Versão do app igual à de version.json
+      - name: Versão (APP_VERSION, version.json e Novidades) consistente
         run: |
           node -e "
             const fs = require('fs');
@@ -33,7 +33,9 @@ jobs:
             const m = fs.readFileSync('app.html', 'utf8').match(/const APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]/);
             if (!m) { console.error('APP_VERSION não encontrado em app.html'); process.exit(1); }
             if (m[1] !== v) { console.error('APP_VERSION (' + m[1] + ') difere de version.json (' + v + ')'); process.exit(1); }
-            console.log('Versão ' + v + ' consistente.');
+            const c = fs.readFileSync('app.html', 'utf8').match(/const CHANGELOG\s*=\s*\[\s*\{\s*version:\s*['\"]([^'\"]+)['\"]/);
+            if (!c || c[1] !== v) { console.error('A primeira entrada de CHANGELOG (Novidades) deve ser a versão ' + v + ' (encontrada: ' + (c ? c[1] : 'nenhuma') + ')'); process.exit(1); }
+            console.log('Versão ' + v + ' consistente (APP_VERSION, version.json e Novidades).');
           "
 
   deploy:
