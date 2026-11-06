@@ -3436,8 +3436,13 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.7.1';
+const APP_VERSION = '4.7.2';
 const CHANGELOG = [
+  { version: '4.7.2', date: 'nov/2026', title: 'Correção: não era possível abrir a obra ("pdata is not defined")', items: [
+    'Abrir obra: corrigido o erro "pdata is not defined" que impedia entrar no projeto. O trecho que recria as linhas de base na importação estava no lugar errado e agora fica só na importação de projetos.',
+    'Importar projeto: as linhas de base (snapshots) do arquivo voltam a ser recriadas com os novos IDs das tarefas.',
+    'Qualidade: o deploy agora é bloqueado automaticamente se o código tiver variáveis não definidas, para que esse tipo de erro não chegue mais ao ar.',
+  ] },
   { version: '4.7.1', date: 'nov/2026', title: 'Correção: erro "Este registro já existe" ao criar tarefa + novo visual', items: [
     'Criar tarefa: corrigido o erro "Este registro já existe." — o código T-NNN agora é reservado no banco e, se houver conflito com um código já usado, o app reserva outro automaticamente.',
     'Restauradas as proteções da 4.7.0 que haviam saído do app: bloqueio de dependências circulares, consultas paginadas e linhas de base salvas no banco.',
@@ -5354,6 +5359,16 @@ const DB = {
       }
     }
 
+    // 10b) Linhas de base (snapshots) — recria com os novos IDs das tarefas
+    for (const b of (pdata.baseline_snapshots || [])) {
+      if (![1, 2, 3, 4].includes(Number(b.slot))) continue;
+      const mapped = {};
+      for (const [oldId, value] of Object.entries(b.tasks || {})) {
+        if (taskMap[oldId]) mapped[taskMap[oldId]] = value;
+      }
+      await this.saveBaseline(newProj.id, { slot: Number(b.slot), set_at: b.set_at || new Date().toISOString(), tasks: mapped });
+    }
+
     // 11) Garante o dono como membro do novo projeto
     // (todo projeto deve ter ao menos 1 membro: o dono)
     if (State.user) {
@@ -5404,16 +5419,6 @@ const DB = {
     State.dependencies = dependencies;
     // Falha explícita: sem esta tabela a aplicação não pode prometer histórico durável.
     State.baselineHistory = await this.listBaselines(State.currentProjectId);
-
-    // Recria os snapshots com os novos IDs das tarefas.
-    for (const b of (pdata.baseline_snapshots || [])) {
-      if (![1, 2, 3, 4].includes(Number(b.slot))) continue;
-      const mapped = {};
-      for (const [oldId, value] of Object.entries(b.tasks || {})) {
-        if (taskMap[oldId]) mapped[taskMap[oldId]] = value;
-      }
-      await this.saveBaseline(newProj.id, { slot: Number(b.slot), set_at: b.set_at || new Date().toISOString(), tasks: mapped });
-    }
     State.disciplines = disciplines;
     State.restrictions = restrictions;
     State.raci = raci;

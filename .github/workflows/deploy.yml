@@ -23,8 +23,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+      - name: Instalar dependências de verificação
+        run: npm ci
       - name: Testes de integridade
         run: node --test tests/integrity.test.mjs
+      - name: Identificadores não definidos (variável usada sem declarar)
+        run: node tests/check-undef.mjs
       - name: Versão (APP_VERSION, version.json e Novidades) consistente
         run: |
           node -e "
