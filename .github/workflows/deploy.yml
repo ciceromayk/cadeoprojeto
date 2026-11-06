@@ -45,14 +45,22 @@ jobs:
     permissions:
       contents: read
       deployments: write
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
     steps:
+      - name: Verificar configuração do Cloudflare
+        if: env.CF_TOKEN == ''
+        run: echo "::notice::Secret CLOUDFLARE_API_TOKEN não configurado — deploy ignorado. Veja a seção 'Deploy automático' do README."
       - uses: actions/checkout@v4
+        if: env.CF_TOKEN != ''
       - name: Montar pasta de publicação (somente arquivos do site)
+        if: env.CF_TOKEN != ''
         run: |
           mkdir dist
           cp index.html app.html version.json dist/
           cp deploy/_headers dist/_headers
       - name: Publicar
+        if: env.CF_TOKEN != ''
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
