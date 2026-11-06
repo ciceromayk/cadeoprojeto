@@ -1,0 +1,69 @@
+name: Deploy (Cloudflare Pages)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Um deploy por branch por vez; um push novo cancela o anterior do mesmo PR.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Testes e verificações
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Testes de integridade
+        run: node --test tests/integrity.test.mjs
+      - name: Versão do app igual à de version.json
+        run: |
+          node -e "
+            const fs = require('fs');
+            const v = JSON.parse(fs.readFileSync('version.json', 'utf8')).version;
+            const m = fs.readFileSync('app.html', 'utf8').match(/const APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]/);
+            if (!m) { console.error('APP_VERSION não encontrado em app.html'); process.exit(1); }
+            if (m[1] !== v) { console.error('APP_VERSION (' + m[1] + ') difere de version.json (' + v + ')'); process.exit(1); }
+            console.log('Versão ' + v + ' consistente.');
+          "
+
+  deploy:
+    name: Publicar no Cloudflare Pages
+    needs: test
+    runs-on: ubuntu-latest
+    # PRs de forks não recebem secrets: não tentam publicar.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Verificar configuração do Cloudflare
+        if: env.CF_TOKEN == ''
+        run: echo "::notice::Secret CLOUDFLARE_API_TOKEN não configurado — deploy ignorado. Veja a seção 'Deploy automático' do README."
+      - uses: actions/checkout@v4
+        if: env.CF_TOKEN != ''
+      - name: Montar pasta de publicação (somente arquivos do site)
+        if: env.CF_TOKEN != ''
+        run: |
+          mkdir dist
+          cp index.html app.html version.json dist/
+          cp deploy/_headers dist/_headers
+      - name: Publicar
+        if: env.CF_TOKEN != ''
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # main -> produção; qualquer outra branch/PR -> preview com URL própria
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT || 'cadeoprojeto' }} --branch=${{ github.head_ref || github.ref_name }} --commit-dirty=true

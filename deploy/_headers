@@ -1,0 +1,19 @@
+# Cabeçalhos do Cloudflare Pages (copiado para dist/ pelo workflow de deploy)
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+
+# O app compara version.json com a versão embutida para avisar de atualização:
+# nunca pode ficar em cache.
+/version.json
+  Cache-Control: no-store
+
+# Páginas: sempre revalidar, para um novo deploy valer na hora.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/app.html
+  Cache-Control: no-cache
