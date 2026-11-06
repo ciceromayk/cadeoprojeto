@@ -1251,6 +1251,47 @@
   .stat-tile-meta { font-size: var(--fs-xs); color: var(--ink-mute); margin-top: 2px; }
   @media (max-width: 900px) { .dash-kpis { grid-template-columns: 1fr; } }
 
+  /* ============= TAREFAS · LISTA AGRUPADA ============= */
+  .tgroups { display: flex; flex-direction: column; gap: 10px; }
+  .tgroup { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+  .tgroup-head {
+    width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    text-align: left; color: var(--ink); background: transparent;
+  }
+  .tgroup-head:hover { background: var(--bg-hover); }
+  .tgroup-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .tgroup-chev { display: inline-block; width: 12px; color: var(--ink-mute); transition: transform .15s; }
+  .tgroup.is-collapsed .tgroup-chev { transform: rotate(-90deg); }
+  .tgroup-name { font-weight: 700; font-size: var(--fs-base); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tgroup-range { font-size: var(--fs-sm); color: var(--ink-mute); white-space: nowrap; }
+  .tgroup-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--ink-soft); }
+  .tgroup-bar { width: 96px; flex-shrink: 0; }
+  .tgroup-body { border-top: 1px solid var(--border); }
+  .tgroup.is-collapsed .tgroup-body { display: none; }
+  .tgroup-add { display: block; width: 100%; text-align: left; padding: 8px 16px 8px 46px; font-size: var(--fs-sm); color: var(--ink-mute); }
+  .tgroup-add:hover { color: var(--accent); background: var(--bg-hover); }
+  .trow-check {
+    width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0;
+    border: 1.5px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center;
+  }
+  .trow-check.is-done { background: var(--status-done); border-color: var(--status-done); color: #fff; }
+  .trow-code { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--ink-mute); flex-shrink: 0; min-width: 44px; }
+  .row-title.is-done { color: var(--ink-mute); text-decoration: line-through; }
+  .trow .row-meta { gap: 14px; }
+  .trow-date { min-width: 58px; text-align: right; font-family: var(--font-mono); }
+  .trow .pill { min-width: 104px; justify-content: flex-start; }
+  .prio-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; cursor: pointer; padding: 0 2px; }
+  .prio-bars i { display: block; width: 3px; border-radius: 1px; background: var(--border-strong); }
+  .prio-bars i:nth-child(1) { height: 6px; } .prio-bars i:nth-child(2) { height: 10px; } .prio-bars i:nth-child(3) { height: 14px; }
+  .prio-bars i.on { background: var(--c); }
+  .avatar-sm.is-empty { background: transparent; color: var(--ink-mute); border: 1px dashed var(--border-strong); cursor: pointer; font-size: 13px; font-weight: 400; }
+  @media (max-width: 760px) {
+    .trow-code, .tgroup-range, .tgroup-bar { display: none; }
+    .trow { flex-wrap: wrap; }
+    .trow .row-meta { width: 100%; justify-content: flex-end; gap: 10px; }
+    .trow .pill { min-width: 0; }
+  }
+
   /* ============= GLOBAL SEARCH ============= */
   .search-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(4px);
@@ -3884,8 +3925,9 @@ const State = {
   overviewSectorFilter: 'all', // Visão Geral — 'all' | '__none__' | nome do setor
   overviewStatusFilter: new Set(['a_fazer', 'em_andamento', 'bloqueada']), // Visão Geral — multi-seleção
   // Filtros avançados da view de Tarefas
-  taskViewMode: 'kanban',  // 'kanban' | 'table' (planilha) — modo 'list' descontinuado
-  taskGroupBy: 'status',   // 'status' | 'discipline' | 'assignee' | 'priority' | 'none'
+  taskViewMode: 'kanban',  // 'kanban' | 'table' (planilha) | 'list' (lista densa agrupada, recolhível)
+  taskGroupBy: 'status',   // 'status' | 'stage' | 'discipline' | 'assignee' | 'sector' | 'priority' | 'none'
+  collapsedTaskGroups: new Map(), // modo Lista: chave do grupo → true (recolhido) / false (expandido); ausente = padrão
   taskFilters: {
     search: '',
     status: 'all',
@@ -8588,8 +8630,6 @@ const Views = {
     const p = this.current();
     if (!p) return this.emptyProject();
     const f = State.taskFilters;
-    // Modo "Lista" (hierárquica) foi descontinuado na Gestão de Tarefas → cai para Tabela
-    if (State.taskViewMode === 'list') State.taskViewMode = 'table';
     const mode = State.taskViewMode;
     const groupBy = State.taskGroupBy;
 
@@ -8634,7 +8674,7 @@ const Views = {
     // === HTML ===
     return `
       <div class="page-title-block">
-        <div class="page-eyebrow">TAREFAS · ${mode === 'kanban' ? 'KANBAN' : 'TABELA'}${activeFilters > 0 ? ` · ${activeFilters} FILTRO${activeFilters > 1 ? 'S' : ''}` : ''}</div>
+        <div class="page-eyebrow">TAREFAS · ${mode === 'kanban' ? 'KANBAN' : mode === 'list' ? 'LISTA' : 'TABELA'}${activeFilters > 0 ? ` · ${activeFilters} FILTRO${activeFilters > 1 ? 'S' : ''}` : ''}</div>
         <div class="page-title">Gestão de Tarefas</div>
         <div class="page-subtitle">${filtered.length} de ${totalTasks} tarefa${totalTasks !== 1 ? 's' : ''}${activeFilters > 0 ? ' (filtradas)' : ''}${DateFilter.label('tasks') ? ` · <span style="color:var(--accent);">término ${DateFilter.label('tasks')}</span>` : ''}</div>
       </div>
@@ -8642,6 +8682,10 @@ const Views = {
       <!-- TOOLBAR: TOGGLE + AGRUPAMENTO -->
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
         <div style="display:flex;border:1px solid var(--border);border-radius:3px;overflow:hidden;">
+          <button class="btn ${mode === 'list' ? 'btn-cta' : 'btn-ghost'}" data-action="task-mode" data-mode="list" style="border-radius:0;padding:6px 14px;font-size:11px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>
+            Lista
+          </button>
           <button class="btn ${mode === 'kanban' ? 'btn-cta' : 'btn-ghost'}" data-action="task-mode" data-mode="kanban" style="border-radius:0;padding:6px 14px;font-size:11px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;margin-right:4px;vertical-align:-2px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
             Kanban
@@ -8655,6 +8699,7 @@ const Views = {
         <label style="font-family:var(--font-mono);font-size:10px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.1em;">Agrupar:</label>
         <select class="form-input" id="taskGroupBy" style="width:auto;min-width:140px;font-size:12px;padding:5px 10px;">
           <option value="status" ${groupBy === 'status' ? 'selected' : ''}>Status</option>
+          <option value="stage" ${groupBy === 'stage' ? 'selected' : ''}>Etapa (atividade pai)</option>
           <option value="discipline" ${groupBy === 'discipline' ? 'selected' : ''}>Disciplina</option>
           <option value="assignee" ${groupBy === 'assignee' ? 'selected' : ''}>Responsável</option>
           <option value="sector" ${groupBy === 'sector' ? 'selected' : ''}>Setor</option>
@@ -8762,7 +8807,7 @@ const Views = {
             <button class="btn btn-cta" data-action="new-task" style="margin-top:8px;">+ Nova Tarefa</button>
           </div>`;
         }
-        return mode === 'kanban' ? this.tasksKanban(filtered, groupBy) : this.tasksList(filtered, groupBy);
+        return mode === 'kanban' ? this.tasksKanban(filtered, groupBy) : mode === 'list' ? this.tasksRows(filtered, groupBy) : this.tasksList(filtered, groupBy);
       })()}
     `;
   },
@@ -8953,6 +8998,7 @@ const Views = {
       assignee: t => t.assignee_id || 'none',
       discipline: t => t.discipline_id || 'none',
       sector: t => t.sector || 'none',
+      stage: t => t.parent_id || 'none',
     }[groupBy] || (t => 'all');
     const labelFn = {
       status: key => ({ a_fazer: 'A Fazer', bloqueada: 'Bloqueada', em_andamento: 'Em Andamento', concluido: 'Concluída' }[key] || key),
@@ -8968,6 +9014,11 @@ const Views = {
         return d ? `${d.code} · ${d.name}` : 'Desconhecida';
       },
       sector: key => (key === 'none' ? 'Sem setor' : key),
+      stage: key => {
+        if (key === 'none') return 'Sem etapa';
+        const pt = State.tasks.find(x => x.id === key);
+        return pt ? pt.title : 'Etapa removida';
+      },
     }[groupBy] || (() => 'Todas');
 
     tasks.forEach(t => {
@@ -8975,7 +9026,76 @@ const Views = {
       if (!map.has(k)) map.set(k, []);
       map.get(k).push(t);
     });
-    return Array.from(map.entries()).map(([key, items]) => ({ key, label: labelFn(key), items }));
+    const out = Array.from(map.entries()).map(([key, items]) => ({ key, label: labelFn(key), items }));
+    if (groupBy === 'stage') {
+      // Etapas na ordem do cronograma (início da atividade pai); "Sem etapa" por último
+      const _st = k => { const pt = State.tasks.find(x => x.id === k); return (pt && pt.start_date) || '9999'; };
+      out.sort((a, b) => (a.key === 'none') - (b.key === 'none') || _st(a.key).localeCompare(_st(b.key)));
+    }
+    return out;
+  },
+
+  // ===== LISTA DENSA (grupos recolhíveis · mini progresso · colunas padronizadas) =====
+  tasksRows(filtered, groupBy) {
+    const memberById = new Map(State.members.map(m => [m.id, m]));
+    const canEdit = DB.iCanEdit();
+    const pillOf = { a_fazer: ['is-todo', 'A fazer'], bloqueada: ['is-late', 'Bloqueada'], em_andamento: ['is-doing', 'Em andamento'], concluido: ['is-done', 'Concluída'] };
+    const prioBars = { critica: 3, alta: 3, media: 2, baixa: 1 };
+    const prioVar = { critica: 'var(--prio-crit)', alta: 'var(--prio-high)', media: 'var(--prio-med)', baixa: 'var(--prio-low)' };
+    const prioLbl = { critica: 'Crítica', alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+    const byDate = (a, b) => (a.end_date || '9999').localeCompare(b.end_date || '9999') || String(a.code || '').localeCompare(String(b.code || ''), 'pt-BR', { numeric: true });
+    const groups = groupBy === 'none'
+      ? [{ key: '__all', label: '', items: [...filtered].sort(byDate) }]
+      : this.groupTasks([...filtered].sort(byDate), groupBy);
+    const t0 = today();
+
+    const rowHtml = t => {
+      const m = memberById.get(t.assignee_id);
+      const done = t.status === 'concluido';
+      const pl = pillOf[t.status] || ['is-todo', String(t.status || '').replace(/_/g, ' ')];
+      const rd = relativeDate(t.end_date, t.status);
+      const late = !done && t.end_date && t.end_date < t0;
+      const pr = t.priority || 'media';
+      return `<div class="row trow" data-action="edit-task" data-id="${t.id}" style="cursor:pointer;">
+        <span class="trow-check${done ? ' is-done' : ''}" aria-hidden="true">${done ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</span>
+        <span class="trow-code">${escapeHtml(t.code || '')}</span>
+        <span class="row-title${done ? ' is-done' : ''}" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</span>
+        <span class="row-meta">
+          <span class="prio-bars" style="--c:${prioVar[pr] || 'var(--ink-mute)'};" title="Prioridade: ${prioLbl[pr] || pr}" onclick="event.stopPropagation();window._openInlinePick(event,'${t.id}','priority');">${[1, 2, 3].map(i => `<i class="${i <= (prioBars[pr] || 1) ? 'on' : ''}"></i>`).join('')}</span>
+          <span class="trow-date" style="color:${late ? 'var(--status-late)' : rd.color};${late ? 'font-weight:700;' : ''}" title="${t.end_date || 'sem prazo'}">${rd.text}</span>
+          <span class="pill ${pl[0]}" style="cursor:pointer;" title="Alterar status" onclick="event.stopPropagation();window._openInlinePick(event,'${t.id}','status');">${escapeHtml(pl[1])}</span>
+          ${m
+            ? `<span class="avatar-sm avatar-tip" data-tip="${escapeHtml(m.name)}" style="background:${colorFromString(m.name)};cursor:pointer;" onclick="event.stopPropagation();window._openInlinePick(event,'${t.id}','assignee');">${escapeHtml(initials(m.name))}</span>`
+            : `<span class="avatar-sm is-empty" title="Sem responsável — clique para atribuir" onclick="event.stopPropagation();window._openInlinePick(event,'${t.id}','assignee');">+</span>`}
+        </span>
+      </div>`;
+    };
+
+    return `<div class="tgroups">` + groups.map(g => {
+      const total = g.items.length;
+      const nDone = g.items.filter(x => x.status === 'concluido').length;
+      const pct = total ? Math.round(nDone / total * 100) : 0;
+      const starts = g.items.map(x => x.start_date).filter(Boolean).sort();
+      const ends = g.items.map(x => x.end_date).filter(Boolean).sort();
+      const range = starts.length && ends.length ? `${fmtDateShort(starts[0])} – ${fmtDateShort(ends[ends.length - 1])}` : '';
+      const hasLate = g.items.some(x => x.status !== 'concluido' && x.end_date && x.end_date < t0);
+      const key = groupBy + ':' + g.key;
+      const ov = State.collapsedTaskGroups.get(key);
+      const collapsed = ov !== undefined ? ov : (total > 0 && nDone === total); // padrão: etapa 100% concluída fica recolhida
+      const body = `<div class="tgroup-body">${g.items.map(rowHtml).join('')}${canEdit ? `<button class="tgroup-add" data-action="new-task">+ Adicionar tarefa</button>` : ''}</div>`;
+      if (!g.label) return `<section class="tgroup">${body}</section>`;
+      return `<section class="tgroup${collapsed ? ' is-collapsed' : ''}" data-group-key="${escapeHtml(key)}">
+        <button class="tgroup-head" data-action="toggle-task-group" data-key="${escapeHtml(key)}" aria-expanded="${collapsed ? 'false' : 'true'}">
+          <span class="tgroup-chev">▾</span>
+          <span class="tgroup-name">${escapeHtml(g.label)}</span>
+          ${range ? `<span class="tgroup-range">${range}</span>` : ''}
+          ${hasLate ? '<span class="pill is-late no-dot" title="Há tarefas atrasadas">atraso</span>' : ''}
+          <span class="tgroup-count">${nDone}/${total}</span>
+          <span class="progress-mini tgroup-bar${pct === 100 ? ' is-done' : ''}" style="--pct:${pct}%;"><span></span></span>
+        </button>
+        ${body}
+      </section>`;
+    }).join('') + `</div>`;
   },
 
   taskCard(t) {
@@ -12684,6 +12804,15 @@ const UI = {
       if (a === 'show-violations') this.showViolations();
       if (a === 'create-demo') this.createDemoProject();
       if (a === 'task-mode') { State.taskViewMode = btn.dataset.mode; UI.render(); }
+      if (a === 'toggle-task-group') {
+        // Alterna só o DOM (sem re-render completo) e guarda a escolha do usuário
+        const sec = btn.closest('.tgroup');
+        if (sec) {
+          const nowCollapsed = sec.classList.toggle('is-collapsed');
+          btn.setAttribute('aria-expanded', nowCollapsed ? 'false' : 'true');
+          State.collapsedTaskGroups.set(btn.dataset.key, nowCollapsed);
+        }
+      }
       if (a === 'kanban-load-more') {
         const from = parseInt(btn.dataset.from) || 0;
         const listEl = btn.closest('.kanban-list') || btn.closest('[data-group-key]');
