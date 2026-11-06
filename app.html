@@ -657,7 +657,7 @@
 
   /* Pilha de avatares */
   .avatar-stack { display: inline-flex; align-items: center; }
-  .avatar-stack > * { margin-left: -6px; box-shadow: 0 0 0 2px var(--bg-panel); border-radius: 50%; }
+  .avatar-stack > * { margin-left: -4px; box-shadow: 0 0 0 2px var(--bg-panel); border-radius: 50%; }
   .avatar-stack > *:first-child { margin-left: 0; }
 
   /* Linha densa de lista (tarefa): título flexível + metadados à direita */
@@ -1197,6 +1197,59 @@
     height: 100%; background: linear-gradient(90deg, var(--accent), var(--blueprint));
     border-radius: 2px; transition: width 0.4s;
   }
+
+  .project-header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .project-header-side { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .project-header-sub { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+  .project-header-sub .project-header-meta { margin-top: 0; }
+  .avatar-sm {
+    width: 24px; height: 24px; border-radius: 50%; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; flex-shrink: 0;
+  }
+  .avatar-sm.is-more { background: var(--bg-elevated); color: var(--ink-soft); }
+
+  /* Faixa de KPIs do Dashboard (3 indicadores) */
+  .dash-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .dash-kpi {
+    --kpi-c: var(--ink-soft);
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--r-md);
+    padding: 14px 18px; min-width: 0;
+  }
+  .dash-kpi-label { font-family: var(--font-mono); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.14em; color: var(--ink-mute); margin-bottom: 6px; }
+  .dash-kpi-main { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; min-width: 0; }
+  .dash-kpi-val { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; color: var(--kpi-c); white-space: nowrap; }
+  .dash-kpi-val.is-text { font-size: var(--fs-md); font-weight: 700; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+  .dash-kpi-sub { font-size: var(--fs-sm); color: var(--ink-soft); white-space: nowrap; }
+  .dash-kpi-foot { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--ink-mute); margin-top: 8px; display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .dash-kpi .progress-mini { margin-top: 8px; }
+
+  /* Tile de contagem por status (substitui os 5 cards inline) */
+  .stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat-tile {
+    --tile-c: var(--ink-mute);
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--r-md);
+  }
+  .stat-tile.is-on {
+    border-color: color-mix(in srgb, var(--tile-c) 28%, transparent);
+    background: color-mix(in srgb, var(--tile-c) 5%, var(--bg-panel));
+  }
+  .stat-tile.t-block { --tone: var(--status-block); }
+  .stat-tile.t-doing { --tone: var(--status-doing); }
+  .stat-tile.t-done  { --tone: var(--status-done); }
+  .stat-tile.t-warn  { --tone: var(--status-review); }
+  .stat-tile.is-on { --tile-c: var(--tone); }
+  .stat-tile-ico {
+    width: 40px; height: 40px; border-radius: var(--r-lg); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; color: var(--tile-c);
+    background: color-mix(in srgb, var(--tile-c) 12%, var(--bg-elevated));
+  }
+  .stat-tile-body { min-width: 0; }
+  .stat-tile-val { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+  .stat-tile.is-on .stat-tile-val { color: var(--tile-c); }
+  .stat-tile-meta { font-size: var(--fs-xs); color: var(--ink-mute); margin-top: 2px; }
+  @media (max-width: 900px) { .dash-kpis { grid-template-columns: 1fr; } }
 
   /* ============= GLOBAL SEARCH ============= */
   .search-overlay {
@@ -2154,7 +2207,13 @@
     </div>
 
     <div id="projectHeader">
-      <div class="project-header-name" id="projectHeaderName">—</div>
+      <div class="project-header-top">
+        <div class="project-header-name" id="projectHeaderName">—</div>
+        <div class="project-header-side">
+          <span class="pill" id="projectHeaderStatus"></span>
+          <span class="avatar-stack" id="projectHeaderTeam"></span>
+        </div>
+      </div>
       <div class="project-header-meta" id="projectHeaderMeta"></div>
     </div>
 
@@ -7072,97 +7131,81 @@ const Views = {
       ${_alertsHtml}
       ${_hojeWidget}
       ${onbHtml}
-      <!-- ── Header card + Progress ring ───────────────────────────────────── -->
-      <div style="display:flex;align-items:stretch;gap:14px;margin-bottom:14px;">
-        <div style="flex:1;min-width:0;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:18px 22px;">
-          <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:6px;">PROJETO ATIVO · ${p.status.replace(/_/g,' ').toUpperCase()}</div>
-          <div style="font-size:22px;font-weight:800;letter-spacing:-0.02em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(p.name)}</div>
-          <div style="font-size:12px;color:var(--ink-soft);margin-top:4px;">${escapeHtml(p.client || 'Sem cliente definido')} · ${fmtDateFull(p.start_date)} → ${fmtDateFull(p.end_date)}</div>
-          <div style="margin-top:16px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-              <span style="font-family:var(--font-mono);font-size:9.5px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink-mute);">Prazo consumido</span>
-              <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:${_dColor};">${_dLeft}</span>
-            </div>
-            <div style="height:5px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;">
-              <div style="width:${timelinePct}%;height:100%;background:${_tlColor};border-radius:3px;transition:width 0.5s;"></div>
-            </div>
-            <div style="font-family:var(--font-mono);font-size:9px;color:var(--ink-mute);margin-top:3px;">${timelinePct}% do prazo · ${elapsedDays}d decorridos de ${totalDays}d total</div>
+      <!-- ── Faixa de KPIs: Progresso | Próximo prazo | Prazo do projeto ───── -->
+      ${(() => {
+        const _hasDates = !!(p.start_date && p.end_date);
+        const _nextTask = [...tasks]
+          .filter(tk => tk.status !== 'concluido' && tk.end_date && tk.end_date >= t)
+          .sort((a, b) => a.end_date.localeCompare(b.end_date))[0];
+        const _nextWho = _nextTask ? State.members.find(m => m.id === _nextTask.assignee_id) : null;
+        const _nextIn  = _nextTask ? daysBetween(t, _nextTask.end_date) : null;
+        return `<div class="dash-kpis">
+          <div class="dash-kpi" style="--kpi-c:${_ringColor};">
+            <div class="dash-kpi-label">Progresso</div>
+            <div class="dash-kpi-main"><span class="dash-kpi-val">${overallProgress}%</span><span class="dash-kpi-sub">${cntConcluida} de ${total} tarefas</span></div>
+            <div class="progress-mini" style="--pct:${overallProgress}%;--bar-c:${_ringColor};"><span></span></div>
+          </div>
+          <div class="dash-kpi">
+            <div class="dash-kpi-label">Próximo prazo</div>
+            ${_nextTask ? `
+              <div class="dash-kpi-main"><span class="dash-kpi-val is-text" title="${escapeHtml(_nextTask.title)}">${escapeHtml(_nextTask.title)}</span></div>
+              <div class="dash-kpi-foot"><span style="color:${_nextIn <= 2 ? 'var(--status-late)' : 'var(--ink-soft)'};font-weight:700;">${fmtDate(_nextTask.end_date)}${_nextIn === 0 ? ' · hoje' : ` · em ${_nextIn}d`}</span>${_nextWho ? `<span class="avatar-sm" style="width:18px;height:18px;font-size:8px;background:${colorFromString(_nextWho.name)};">${escapeHtml(initials(_nextWho.name))}</span><span>${escapeHtml(_nextWho.name)}</span>` : ''}</div>
+            ` : `
+              <div class="dash-kpi-main"><span class="dash-kpi-val is-text" style="color:var(--ink-mute);">Nenhum prazo futuro</span></div>
+              <div class="dash-kpi-foot">sem tarefas abertas com data</div>
+            `}
+          </div>
+          <div class="dash-kpi" style="--kpi-c:${_hasDates ? _dColor : 'var(--ink-mute)'};">
+            <div class="dash-kpi-label">Prazo do projeto</div>
+            <div class="dash-kpi-main"><span class="dash-kpi-val ${_hasDates ? '' : 'is-text'}">${_hasDates ? _dLeft : 'Sem datas'}</span>${_hasDates ? `<span class="dash-kpi-sub">${timelinePct}% consumido</span>` : ''}</div>
+            ${_hasDates ? `<div class="progress-mini" style="--pct:${timelinePct}%;--bar-c:${_tlColor};"><span></span></div>
+            <div class="dash-kpi-foot">${fmtDateFull(p.start_date)} → ${fmtDateFull(p.end_date)}</div>` : `<div class="dash-kpi-foot">defina início e fim do projeto</div>`}
+          </div>
+        </div>`;
+      })()}
+
+      <!-- ── Tiles de contagem por status ───────────────────────────────────── -->
+      <div class="stat-tiles">
+        <div class="stat-tile ">
+          <div class="stat-tile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M7 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg></div>
+          <div class="stat-tile-body">
+            <div class="stat-label" style="margin-bottom:2px;">A Fazer</div>
+            <div class="stat-tile-val">${cntAFazer}</div>
+            <div class="stat-tile-meta">${pct(cntAFazer)}% do total</div>
           </div>
         </div>
-        <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:16px 22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-width:150px;">
-          <svg width="108" height="108" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="${_R}" fill="none" stroke="var(--bg-elevated)" stroke-width="9"/>
-            <circle cx="50" cy="50" r="${_R}" fill="none" stroke="${_ringColor}" stroke-width="9"
-              stroke-dasharray="${_CIRC}" stroke-dashoffset="${_ringOff}"
-              stroke-linecap="round" transform="rotate(-90 50 50)"
-              style="transition:stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1);"/>
-            <text x="50" y="47" text-anchor="middle" dominant-baseline="auto"
-              fill="var(--ink-soft)" font-size="20" font-weight="800" font-family="Space Grotesk,sans-serif">${overallProgress}%</text>
-            <text x="50" y="62" text-anchor="middle" dominant-baseline="auto"
-              fill="var(--ink-mute)" font-size="8" font-family="JetBrains Mono,monospace" letter-spacing="1">AVANÇO</text>
-          </svg>
-          <div style="font-family:var(--font-mono);font-size:9px;color:var(--ink-mute);text-transform:uppercase;letter-spacing:0.12em;">${total} tarefas</div>
-        </div>
-      </div>
-
-      <!-- ── 5 Stat cards ───────────────────────────────────────────────────── -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:14px;">
-
-        <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:var(--bg-elevated);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ink-mute)" stroke-width="2.2"><rect x="9" y="2" width="6" height="4" rx="1"/><path d="M7 2H5a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2h-2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-mute);margin-bottom:2px;">A Fazer</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.04em;line-height:1;">${cntAFazer}</div>
-            <div style="font-size:10px;color:var(--ink-mute);margin-top:2px;">${pct(cntAFazer)}% do total</div>
+        <div class="stat-tile t-block${cntBloqueada > 0 ? ' is-on' : ''}">
+          <div class="stat-tile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+          <div class="stat-tile-body">
+            <div class="stat-label" style="margin-bottom:2px;">Bloqueadas</div>
+            <div class="stat-tile-val">${cntBloqueada}</div>
+            <div class="stat-tile-meta">${cntBloqueada === 0 ? 'sem impedimentos' : 'requerem atenção'}</div>
           </div>
         </div>
-
-        <div style="background:${cntBloqueada > 0 ? 'rgba(193,59,18,0.05)' : 'var(--bg-panel)'};border:1px solid ${cntBloqueada > 0 ? 'rgba(193,59,18,0.3)' : 'var(--border)'};border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${cntBloqueada > 0 ? 'rgba(193,59,18,0.12)' : 'var(--bg-elevated)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${cntBloqueada > 0 ? 'var(--accent-danger)' : 'var(--ink-mute)'}" stroke-width="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-mute);margin-bottom:2px;">Bloqueadas</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.04em;line-height:1;${cntBloqueada > 0 ? 'color:var(--accent-danger);' : ''}">${cntBloqueada}</div>
-            <div style="font-size:10px;color:var(--ink-mute);margin-top:2px;">${cntBloqueada === 0 ? 'sem impedimentos' : 'requerem atenção'}</div>
+        <div class="stat-tile t-doing${cntAndamento > 0 ? ' is-on' : ''}">
+          <div class="stat-tile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg></div>
+          <div class="stat-tile-body">
+            <div class="stat-label" style="margin-bottom:2px;">Em Andamento</div>
+            <div class="stat-tile-val">${cntAndamento}</div>
+            <div class="stat-tile-meta">${pct(cntAndamento)}% do total</div>
           </div>
         </div>
-
-        <div style="background:${cntAndamento > 0 ? 'rgba(229,75,26,0.04)' : 'var(--bg-panel)'};border:1px solid ${cntAndamento > 0 ? 'rgba(229,75,26,0.25)' : 'var(--border)'};border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${cntAndamento > 0 ? 'rgba(229,75,26,0.10)' : 'var(--bg-elevated)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${cntAndamento > 0 ? 'var(--accent)' : 'var(--ink-mute)'}" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-mute);margin-bottom:2px;">Em Andamento</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.04em;line-height:1;${cntAndamento > 0 ? 'color:var(--accent);' : ''}">${cntAndamento}</div>
-            <div style="font-size:10px;color:var(--ink-mute);margin-top:2px;">${pct(cntAndamento)}% do total</div>
+        <div class="stat-tile t-done${cntConcluida > 0 ? ' is-on' : ''}">
+          <div class="stat-tile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+          <div class="stat-tile-body">
+            <div class="stat-label" style="margin-bottom:2px;">Concluídas</div>
+            <div class="stat-tile-val">${cntConcluida}</div>
+            <div class="stat-tile-meta">${pct(cntConcluida)}% do total</div>
           </div>
         </div>
-
-        <div style="background:${cntConcluida > 0 ? 'rgba(46,125,79,0.04)' : 'var(--bg-panel)'};border:1px solid ${cntConcluida > 0 ? 'rgba(46,125,79,0.25)' : 'var(--border)'};border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${cntConcluida > 0 ? 'rgba(46,125,79,0.10)' : 'var(--bg-elevated)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${cntConcluida > 0 ? 'var(--accent-success)' : 'var(--ink-mute)'}" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-mute);margin-bottom:2px;">Concluídas</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.04em;line-height:1;${cntConcluida > 0 ? 'color:var(--accent-success);' : ''}">${cntConcluida}</div>
-            <div style="font-size:10px;color:var(--ink-mute);margin-top:2px;">${pct(cntConcluida)}% do total</div>
+        <div class="stat-tile t-warn${criticalCount > 0 ? ' is-on' : ''}">
+          <div class="stat-tile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+          <div class="stat-tile-body">
+            <div class="stat-label" style="margin-bottom:2px;">Críticas</div>
+            <div class="stat-tile-val">${criticalCount}</div>
+            <div class="stat-tile-meta">${cpm.violations.size > 0 ? `<span style="color:var(--accent-warm);">⚠ ${cpm.violations.size} ${cpm.violations.size === 1 ? 'violação' : 'violações'}</span>` : 'caminho crítico'}</div>
           </div>
         </div>
-
-        <div style="background:${criticalCount > 0 ? 'rgba(212,168,44,0.04)' : 'var(--bg-panel)'};border:1px solid ${criticalCount > 0 ? 'rgba(212,168,44,0.3)' : 'var(--border)'};border-radius:6px;padding:14px 16px;display:flex;align-items:center;gap:12px;">
-          <div style="width:40px;height:40px;border-radius:8px;background:${criticalCount > 0 ? 'rgba(212,168,44,0.10)' : 'var(--bg-elevated)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${criticalCount > 0 ? 'var(--accent-warm)' : 'var(--ink-mute)'}" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:0.14em;color:var(--ink-mute);margin-bottom:2px;">Críticas</div>
-            <div style="font-size:28px;font-weight:800;letter-spacing:-0.04em;line-height:1;${criticalCount > 0 ? 'color:var(--accent-warm);' : ''}">${criticalCount}</div>
-            <div style="font-size:10px;color:var(--ink-mute);margin-top:2px;">${cpm.violations.size > 0 ? `<span style="color:var(--accent-warm);">⚠ ${cpm.violations.size} violação${cpm.violations.size !== 1 ? 'ões' : ''}</span>` : 'caminho crítico'}</div>
-          </div>
-        </div>
-
       </div>
 
       <!-- ── Middle: Upcoming deadlines | Priority + Disciplines ───────────── -->
@@ -11988,6 +12031,22 @@ const UI = {
         $('#projectHeaderName').textContent = p.name;
         const _prog = p ? Math.round(physicalProgress(State.tasks)) : 0;
         $('#projectHeaderMeta').textContent = `${p.client || 'Sem cliente'} · ${p.start_date ? fmtDateFull(p.start_date) + ' → ' + fmtDateFull(p.end_date) : 'Sem datas'} · ${_prog}% concluído`;
+        // Status do projeto (pílula) — valores: planejamento, em_andamento, pausado, concluido
+        const _stEl = $('#projectHeaderStatus');
+        if (_stEl) {
+          const _stMap = { planejamento: ['is-todo', 'Planejamento'], em_andamento: ['is-doing', 'Em andamento'], pausado: ['is-review', 'Pausado'], concluido: ['is-done', 'Concluído'] };
+          const _st = _stMap[p.status];
+          _stEl.className = 'pill ' + (_st ? _st[0] : 'is-todo');
+          _stEl.textContent = _st ? _st[1] : String(p.status || '').replace(/_/g, ' ');
+          _stEl.style.display = p.status ? '' : 'none';
+        }
+        // Equipe: até 4 avatares + contador
+        const _teamEl = $('#projectHeaderTeam');
+        if (_teamEl) {
+          const _ms = (State.members || []).filter(m => m && m.name);
+          _teamEl.innerHTML = _ms.slice(0, 4).map(m => `<span class="avatar-sm avatar-tip" data-tip="${escapeHtml(m.name)}" style="background:${colorFromString(m.name)};">${escapeHtml(initials(m.name))}</span>`).join('')
+            + (_ms.length > 4 ? `<span class="avatar-sm is-more" title="${_ms.length - 4} membros a mais">+${_ms.length - 4}</span>` : '');
+        }
       } else {
         _ph.style.display = 'none';
       }
