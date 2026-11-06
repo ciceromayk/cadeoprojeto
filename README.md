@@ -52,3 +52,30 @@ node --test tests/integrity.test.mjs
 Essa suíte cobre ciclos de predecessoras, invalidação de feriados e data civil
 local. A verificação de políticas RLS e das operações reais com Supabase exige
 um banco de testes com o esquema histórico, ausente deste repositório.
+
+## Deploy automático (Cloudflare Pages)
+
+O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publica
+o site no Cloudflare Pages:
+
+- **push na `main`** → produção;
+- **pull request** → preview com URL própria (só para PRs do próprio repositório);
+- antes de publicar, roda `node --test tests/integrity.test.mjs` e confere se
+  `APP_VERSION` em `app.html` é igual à de `version.json`;
+- só `index.html`, `app.html` e `version.json` vão para o ar (migrações, testes
+  e README ficam de fora); `deploy/_headers` define o cache (`version.json` nunca
+  é cacheado, para o aviso de nova versão funcionar).
+
+### Configuração única
+
+1. No Cloudflare: **Workers & Pages → Create → Pages → Direct Upload** e crie o
+   projeto (o nome padrão esperado é `cadeoprojeto`).
+2. Crie um **API Token** com a permissão *Account → Cloudflare Pages → Edit*.
+3. No GitHub, em **Settings → Secrets and variables → Actions**:
+   - *Secrets*: `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`;
+   - *Variables* (opcional): `CLOUDFLARE_PAGES_PROJECT`, se o projeto tiver outro nome.
+4. No Supabase (**Authentication → URL Configuration**), adicione o domínio do
+   Pages (e o domínio próprio, se houver) em *Site URL / Redirect URLs*.
+
+A migração SQL (`migrations/001-integrity.sql`) continua sendo executada
+manualmente no Supabase, **antes** de publicar uma versão que dependa dela.
