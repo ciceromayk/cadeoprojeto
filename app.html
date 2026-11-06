@@ -4352,12 +4352,25 @@ const DB = {
     return data || [];
   },
 
+  // Reserva códigos T-NNN no banco (RPC atômica, migrations/001-integrity.sql).
+  // Evita repetir código por concorrência, exclusões ou lacunas na numeração.
+  async allocateTaskCodes(projectId, count) {
+    const codes = [];
+    while (codes.length < count) {
+      const size = Math.min(500, count - codes.length);
+      const { data, error } = await State.supabase.rpc('allocate_task_codes', {
+        p_project_id: projectId, p_count: size
+      });
+      if (error) throw new Error('Migração de códigos de tarefas pendente (migrations/001-integrity.sql): ' + error.message);
+      if (!Array.isArray(data) || data.length !== size) throw new Error('Falha ao reservar códigos de tarefas.');
+      codes.push(...data);
+    }
+    return codes;
+  },
+
   async createTask(projectId, t) {
-    // Gera código sequencial T-XXX baseado na contagem
-    const { count } = await State.supabase
-      .from('tasks').select('*', { count: 'exact', head: true }).eq('project_id', projectId);
-    const code = 'T-' + String((count || 0) + 1).padStart(3, '0');
-    const payload = { project_id: projectId, code, ...t };
+    const [code] = await this.allocateTaskCodes(projectId, 1);
+    const payload = { project_id: projectId, ...t, code: t.code || code };
     // order_index padrão (vai para o fim) se não foi informado — usa epoch (ms), bem acima do backfill
     if (payload.order_index === undefined || payload.order_index === null) payload.order_index = Date.now();
     const { data, error } = await State.supabase
@@ -4438,15 +4451,13 @@ const DB = {
   // Gera códigos sequenciais T-XXX. Retorna o array criado (mesma ordem do payload).
   async createTasksBatch(projectId, tasksData) {
     if (!tasksData?.length) return [];
-    const { count } = await State.supabase
-      .from('tasks').select('*', { count: 'exact', head: true }).eq('project_id', projectId);
-    let next = (count || 0) + 1;
+    const codes = await this.allocateTaskCodes(projectId, tasksData.length);
     const epoch = Date.now();
     const rows = tasksData.map((t, i) => ({
       project_id: projectId,
-      code: 'T-' + String(next++).padStart(3, '0'),
       order_index: epoch + i,
       ...t,
+      code: t.code || codes[i],
     }));
     // Estratégia de tentativa: lote completo; se falhar por coluna ausente,
     // strip do campo problemático e retentar (mesma resiliência do importer).
