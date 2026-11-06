@@ -16,4 +16,7 @@ Sempre que fizer uma correção, melhoria ou preparar um deploy que chegue ao us
 - `app.html` usa fim de linha CRLF: preserve-o ao editar por script.
 - Migrações SQL ficam em `migrations/` e são executadas manualmente no Supabase, em ordem, antes de
   publicar a versão que depende delas. Devem ser idempotentes.
-- Testes: `node --test tests/integrity.test.mjs`.
+- Testes: `node --test tests/integrity.test.mjs` e `npm run check:undef` (detecta variáveis não definidas;
+  rode `npm ci` antes). **Antes de entregar mudança em `app.html`, rode os dois.**
+- Ao reaplicar/mesclar código de outra versão, confira o posicionamento: um bloco na função errada gera
+  erros de runtime (ex.: `pdata is not defined`) que só o `check:undef` e o uso real do app revelam.

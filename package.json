@@ -1,0 +1,13 @@
+{
+  "name": "cadeoprojeto",
+  "private": true,
+  "description": "Aplicação estática (index.html + app.html). package.json existe só para as verificações de CI.",
+  "scripts": {
+    "test": "node --test tests/integrity.test.mjs",
+    "check:undef": "node tests/check-undef.mjs"
+  },
+  "devDependencies": {
+    "eslint": "9.39.5",
+    "globals": "15.15.0"
+  }
+}
