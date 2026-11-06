@@ -88,15 +88,18 @@ CREATE TABLE IF NOT EXISTS public.project_baselines (
 ALTER TABLE public.project_baselines ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.project_baselines TO authenticated;
 
+DROP POLICY IF EXISTS project_baselines_read ON public.project_baselines;
 CREATE POLICY project_baselines_read ON public.project_baselines FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id
     AND (p.owner_id = auth.uid() OR EXISTS (SELECT 1 FROM public.project_shares s
       WHERE s.project_id = p.id AND s.user_id = auth.uid()))));
+DROP POLICY IF EXISTS project_baselines_insert ON public.project_baselines;
 CREATE POLICY project_baselines_insert ON public.project_baselines FOR INSERT TO authenticated
   WITH CHECK (created_by = auth.uid() AND EXISTS (SELECT 1 FROM public.projects p
     WHERE p.id = project_id AND (p.owner_id = auth.uid() OR EXISTS (
       SELECT 1 FROM public.project_shares s WHERE s.project_id = p.id
       AND s.user_id = auth.uid() AND s.role = 'admin'))));
+DROP POLICY IF EXISTS project_baselines_update ON public.project_baselines;
 CREATE POLICY project_baselines_update ON public.project_baselines FOR UPDATE TO authenticated
   USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id
     AND (p.owner_id = auth.uid() OR EXISTS (SELECT 1 FROM public.project_shares s
@@ -105,6 +108,7 @@ CREATE POLICY project_baselines_update ON public.project_baselines FOR UPDATE TO
     WHERE p.id = project_id AND (p.owner_id = auth.uid() OR EXISTS (
       SELECT 1 FROM public.project_shares s WHERE s.project_id = p.id
       AND s.user_id = auth.uid() AND s.role = 'admin'))));
+DROP POLICY IF EXISTS project_baselines_delete ON public.project_baselines;
 CREATE POLICY project_baselines_delete ON public.project_baselines FOR DELETE TO authenticated
   USING (EXISTS (SELECT 1 FROM public.projects p WHERE p.id = project_id
     AND (p.owner_id = auth.uid() OR EXISTS (SELECT 1 FROM public.project_shares s
