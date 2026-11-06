@@ -7198,7 +7198,7 @@ const Views = {
             <div class="dash-kpi-label">Próximo prazo</div>
             ${_nextTask ? `
               <div class="dash-kpi-main"><span class="dash-kpi-val is-text" title="${escapeHtml(_nextTask.title)}">${escapeHtml(_nextTask.title)}</span></div>
-              <div class="dash-kpi-foot"><span style="color:${_nextIn <= 2 ? 'var(--status-late)' : 'var(--ink-soft)'};font-weight:700;">${fmtDate(_nextTask.end_date)}${_nextIn === 0 ? ' · hoje' : ` · em ${_nextIn}d`}</span>${_nextWho ? `<span class="avatar-sm" style="width:18px;height:18px;font-size:8px;background:${colorFromString(_nextWho.name)};">${escapeHtml(initials(_nextWho.name))}</span><span>${escapeHtml(_nextWho.name)}</span>` : ''}</div>
+              <div class="dash-kpi-foot"><span style="color:${_nextIn <= 2 ? 'var(--status-late)' : 'var(--ink-soft)'};font-weight:700;">${_parseYMD(_nextTask.end_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}${_nextIn === 0 ? ' · hoje' : ` · em ${_nextIn}d`}</span>${_nextWho ? `<span class="avatar-sm" style="width:18px;height:18px;font-size:8px;background:${colorFromString(_nextWho.name)};">${escapeHtml(initials(_nextWho.name))}</span><span>${escapeHtml(_nextWho.name)}</span>` : ''}</div>
             ` : `
               <div class="dash-kpi-main"><span class="dash-kpi-val is-text" style="color:var(--ink-mute);">Nenhum prazo futuro</span></div>
               <div class="dash-kpi-foot">sem tarefas abertas com data</div>
