@@ -3436,8 +3436,12 @@ async function checkAppVersion() {
 }
 
 // ---------- VERSÃO & CHANGELOG ----------
-const APP_VERSION = '4.7.2';
+const APP_VERSION = '4.7.3';
 const CHANGELOG = [
+  { version: '4.7.3', date: 'nov/2026', title: 'Melhoria: medição da origem dos cadastros', items: [
+    'Cadastro: o app passa a registrar de onde a pessoa chegou (ex.: link da bio do Instagram) para sabermos quais canais trazem novos usuários. Só a origem é guardada, junto com a conta, e nada é compartilhado com terceiros.',
+    'Links curtos para divulgação: cadeoprojeto.net/ig, /ig-reels e /ig-dm.',
+  ] },
   { version: '4.7.2', date: 'nov/2026', title: 'Correção: não era possível abrir a obra ("pdata is not defined")', items: [
     'Abrir obra: corrigido o erro "pdata is not defined" que impedia entrar no projeto. O trecho que recria as linhas de base na importação estava no lugar errado e agora fica só na importação de projetos.',
     'Importar projeto: as linhas de base (snapshots) do arquivo voltam a ser recriadas com os novos IDs das tarefas.',
@@ -4203,6 +4207,35 @@ const Config = {
   }
 };
 
+// ---------- ORIGEM DO CADASTRO (UTM) ----------
+// Guarda a primeira origem vista neste navegador (utm_* ou site de referência)
+// e a envia apenas no cadastro, em user_metadata.origem. Nada é enviado a terceiros.
+const Attribution = {
+  KEY: 'cdp:origem',
+  capture() {
+    try {
+      if (localStorage.getItem(this.KEY)) return;
+      const p = new URLSearchParams(location.search);
+      const o = {};
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(k => {
+        const v = p.get(k);
+        if (v) o[k] = v.slice(0, 100);
+      });
+      if (!Object.keys(o).length && document.referrer) {
+        const host = new URL(document.referrer).hostname;
+        if (host && host !== location.hostname) o.referrer = host.slice(0, 100);
+      }
+      if (!Object.keys(o).length) return;
+      o.first_seen = new Date().toISOString();
+      localStorage.setItem(this.KEY, JSON.stringify(o));
+    } catch (_) { /* localStorage indisponível: ignora */ }
+  },
+  get() {
+    try { return JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (_) { return null; }
+  }
+};
+Attribution.capture();
+
 // ---------- AUTH ----------
 const Auth = {
   mode: 'login',
@@ -4210,7 +4243,12 @@ const Auth = {
   async signUp(email, password, fullName) {
     const { data, error } = await State.supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName } }
+      options: { data: (() => {
+        const meta = { full_name: fullName };
+        const origem = Attribution.get();
+        if (origem) meta.origem = origem;
+        return meta;
+      })() }
     });
     if (error) throw error;
     return data;
