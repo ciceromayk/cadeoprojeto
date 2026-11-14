@@ -1,0 +1,5 @@
+# Links curtos para divulgação (copiado para dist/ pelo workflow de deploy).
+# Chegam à página inicial já com UTM; a origem é guardada e enviada no cadastro.
+/ig        /?utm_source=instagram&utm_medium=bio&utm_campaign=perfil         302
+/ig-reels  /?utm_source=instagram&utm_medium=reels&utm_campaign=organico     302
+/ig-dm     /?utm_source=instagram&utm_medium=dm&utm_campaign=automacao       302

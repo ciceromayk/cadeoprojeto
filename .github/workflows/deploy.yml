@@ -67,6 +67,7 @@ jobs:
           cp index.html app.html version.json dist/
           cp -r css js dist/
           cp deploy/_headers dist/_headers
+          cp deploy/_redirects dist/_redirects
       - name: Publicar
         if: env.CF_TOKEN != ''
         uses: cloudflare/wrangler-action@v3
