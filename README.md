@@ -63,7 +63,8 @@ o site no Cloudflare Pages:
 - antes de publicar, roda `node --test tests/integrity.test.mjs` e confere se
   `APP_VERSION` em `app.html` é igual à de `version.json`;
 - só `index.html`, `app.html` e `version.json` vão para o ar (migrações, testes
-  e README ficam de fora); `deploy/_headers` define o cache (`version.json` nunca
+  e README ficam de fora); `deploy/_redirects` cria os links curtos de divulgação
+  (`/ig`, `/ig-reels`, `/ig-dm`, com UTM); `deploy/_headers` define o cache (`version.json` nunca
   é cacheado, para o aviso de nova versão funcionar).
 
 ### Configuração única
