@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const between = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const memory = new Map();
 const sandbox = {
@@ -120,4 +121,20 @@ test('criação concorrente usa códigos reservados pelo banco', async () => {
     sandbox.__db.createTask('P', { title: 'B' }),
   ]);
   assert.deepEqual(inserted.map(t => t.code).sort(), ['T-042', 'T-043']);
+});
+
+test('o CSS do app vem de css/app.css (arquivo existe, é referenciado e não sobrou <style> global)', () => {
+  assert.match(html, /<link rel="stylesheet" href="css\/app\.css">/);
+  const css = readFileSync(new URL('../css/app.css', import.meta.url), 'utf8');
+  assert.ok(css.includes(':root'), 'css/app.css deve conter os tokens de design');
+  assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length, 'chaves do CSS desbalanceadas');
+  const head = html.slice(0, html.indexOf('</head>'));
+  assert.ok(!head.includes('<style'), 'o <head> não deve mais ter <style> inline');
+});
+
+test('o código do app vem de js/app.js (referenciado como módulo e sem script inline)', () => {
+  assert.match(html, /<script type="module" src="js\/app\.js"><\/script>/);
+  assert.ok(!/<script type="module">/.test(html), 'app.html não deve mais ter módulo inline');
+  assert.match(source, /^import \{ createClient \} from /);
+  assert.match(source, /const APP_VERSION = '/);
 });

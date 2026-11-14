@@ -17,3 +17,9 @@
   Cache-Control: no-cache
 /app.html
   Cache-Control: no-cache
+
+# Estilos e código: revalidar sempre (ETag), para um novo deploy valer na hora.
+/css/*
+  Cache-Control: no-cache
+/js/*
+  Cache-Control: no-cache
