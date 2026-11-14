@@ -41,6 +41,35 @@ export const Config = {
   }
 };
 
+// ---------- ORIGEM DO CADASTRO (UTM) ----------
+// Guarda a primeira origem vista neste navegador (utm_* ou site de referência)
+// e a envia apenas no cadastro, em user_metadata.origem. Nada é enviado a terceiros.
+const Attribution = {
+  KEY: 'cdp:origem',
+  capture() {
+    try {
+      if (localStorage.getItem(this.KEY)) return;
+      const p = new URLSearchParams(location.search);
+      const o = {};
+      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach(k => {
+        const v = p.get(k);
+        if (v) o[k] = v.slice(0, 100);
+      });
+      if (!Object.keys(o).length && document.referrer) {
+        const host = new URL(document.referrer).hostname;
+        if (host && host !== location.hostname) o.referrer = host.slice(0, 100);
+      }
+      if (!Object.keys(o).length) return;
+      o.first_seen = new Date().toISOString();
+      localStorage.setItem(this.KEY, JSON.stringify(o));
+    } catch (_) { /* localStorage indisponível: ignora */ }
+  },
+  get() {
+    try { return JSON.parse(localStorage.getItem(this.KEY) || 'null'); } catch (_) { return null; }
+  }
+};
+Attribution.capture();
+
 // ---------- AUTH ----------
 export const Auth = {
   mode: 'login',
@@ -48,7 +77,12 @@ export const Auth = {
   async signUp(email, password, fullName) {
     const { data, error } = await State.supabase.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName } }
+      options: { data: (() => {
+        const meta = { full_name: fullName };
+        const origem = Attribution.get();
+        if (origem) meta.origem = origem;
+        return meta;
+      })() }
     });
     if (error) throw error;
     return data;
