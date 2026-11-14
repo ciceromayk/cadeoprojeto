@@ -35,7 +35,7 @@ alterações dessa tentativa são revertidas.
 
 O aplicativo novo informa erro se a migração ainda não tiver sido aplicada.
 Depois da migração, publique juntos
-`index.html`, `app.html` e `version.json` no mesmo diretório.
+`index.html`, `app.html`, `version.json` e a pasta `css/` no mesmo diretório.
 
 Na primeira abertura de cada projeto pelo proprietário, as linhas de base
 antigas do navegador são copiadas para o banco. O registro local é removido
@@ -62,7 +62,7 @@ o site no Cloudflare Pages:
 - **pull request** → preview com URL própria (só para PRs do próprio repositório);
 - antes de publicar, roda `node --test tests/integrity.test.mjs` e confere se
   `APP_VERSION` em `app.html` é igual à de `version.json`;
-- só `index.html`, `app.html` e `version.json` vão para o ar (migrações, testes
+- só `index.html`, `app.html`, `version.json` e `css/` vão para o ar (migrações, testes
   e README ficam de fora); `deploy/_headers` define o cache (`version.json` nunca
   é cacheado, para o aviso de nova versão funcionar).
 

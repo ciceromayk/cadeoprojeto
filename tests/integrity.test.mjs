@@ -121,3 +121,12 @@ test('criação concorrente usa códigos reservados pelo banco', async () => {
   ]);
   assert.deepEqual(inserted.map(t => t.code).sort(), ['T-042', 'T-043']);
 });
+
+test('o CSS do app vem de css/app.css (arquivo existe, é referenciado e não sobrou <style> global)', () => {
+  assert.match(source, /<link rel="stylesheet" href="css\/app\.css">/);
+  const css = readFileSync(new URL('../css/app.css', import.meta.url), 'utf8');
+  assert.ok(css.includes(':root'), 'css/app.css deve conter os tokens de design');
+  assert.equal((css.match(/\{/g) || []).length, (css.match(/\}/g) || []).length, 'chaves do CSS desbalanceadas');
+  const head = source.slice(0, source.indexOf('</head>'));
+  assert.ok(!head.includes('<style'), 'o <head> não deve mais ter <style> inline');
+});

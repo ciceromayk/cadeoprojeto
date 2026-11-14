@@ -65,6 +65,7 @@ jobs:
         run: |
           mkdir dist
           cp index.html app.html version.json dist/
+          cp -r css dist/css
           cp deploy/_headers dist/_headers
       - name: Publicar
         if: env.CF_TOKEN != ''
