@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import vm from 'node:vm';
 
 const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8');
-const source = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+// O app é dividido em módulos ES (js/*.js). Os testes de lógica recortam trechos por texto,
+// então juntamos os módulos (sem import/export) para rodá-los no sandbox.
+const jsDir = new URL('../js/', import.meta.url);
+// Ordem de concatenação = ordem original do código (os recortes por texto dependem dela).
+const ORDER = ['helpers', 'mentions', 'cpm', 'feedback', 'changelog', 'state', 'auth', 'eap-templates', 'db', 'perf', 'health',
+  'baseline', 'keyboard', 'modal', 'mspx', 'views', 'kanban-config', 'gantt-cols', 'automation', 'dialog', 'ui',
+  'global-search', 'legal-docs', 'tour', 'inline-edit', 'app'].map(n => n + '.js');
+const jsFiles = [...ORDER, ...readdirSync(jsDir).filter(f => f.endsWith('.js') && !ORDER.includes(f)).sort()];
+const modules = Object.fromEntries(jsFiles.map(f => [f, readFileSync(new URL(f, jsDir), 'utf8')]));
+const source = jsFiles.map(f => modules[f].replace(/^import .*$/gm, '').replace(/^export (?=const|let|function|async)/gm, '')).join('\n');
 const between = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
 const memory = new Map();
 const sandbox = {
@@ -135,6 +144,18 @@ test('o CSS do app vem de css/app.css (arquivo existe, é referenciado e não so
 test('o código do app vem de js/app.js (referenciado como módulo e sem script inline)', () => {
   assert.match(html, /<script type="module" src="js\/app\.js"><\/script>/);
   assert.ok(!/<script type="module">/.test(html), 'app.html não deve mais ter módulo inline');
-  assert.match(source, /^import \{ createClient \} from /);
-  assert.match(source, /const APP_VERSION = '/);
+  assert.match(modules['app.js'], /^import \{ createClient \} from 'https:\/\/esm\.sh\//m);
+  assert.match(modules['changelog.js'], /export const APP_VERSION = '/);
+});
+
+test('todo import entre módulos aponta para um export que existe, e todo módulo é pré-carregado', () => {
+  const exportsOf = f => new Set([...modules[f].matchAll(/^export (?:async )?(?:const|let|function) ([A-Za-z_$][\w$]*)/gm)].map(m => m[1]));
+  for (const f of jsFiles) {
+    for (const m of modules[f].matchAll(/^import \{([^}]+)\} from '\.\/([\w-]+\.js)';$/gm)) {
+      assert.ok(modules[m[2]], `${f}: importa ./${m[2]}, que não existe`);
+      const have = exportsOf(m[2]);
+      for (const name of m[1].split(',').map(x => x.trim())) assert.ok(have.has(name), `${f}: importa "${name}" de ./${m[2]}, que não exporta`);
+    }
+    assert.ok(html.includes(`<link rel="modulepreload" href="js/${f}">`), `app.html: falta <link rel="modulepreload" href="js/${f}">`);
+  }
 });

@@ -61,7 +61,7 @@ o site no Cloudflare Pages:
 - **push na `main`** → produção;
 - **pull request** → preview com URL própria (só para PRs do próprio repositório);
 - antes de publicar, roda `node --test tests/integrity.test.mjs` e confere se
-  `APP_VERSION` em `js/app.js` é igual à de `version.json`;
+  `APP_VERSION` em `js/changelog.js` é igual à de `version.json`;
 - só `index.html`, `app.html`, `version.json`, `css/` e `js/` vão para o ar (migrações, testes
   e README ficam de fora); `deploy/_redirects` cria os links curtos de divulgação
   (`/ig`, `/ig-reels`, `/ig-dm`, com UTM); `deploy/_headers` define o cache (`version.json` nunca
