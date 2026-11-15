@@ -437,7 +437,6 @@ export const Views = {
     // Alertas agora são exibidos via botão na topbar (modal)
     const _alertsHtml = '';
 
-
     // ── Checklist de onboarding (persiste dispensa no localStorage) ──────────
     const onbKey = `projetudo.onb.${p.id}`;
     const onbDismissed = (() => { try { return localStorage.getItem(onbKey) === '1'; } catch(e) { return true; } })();
@@ -2569,54 +2568,6 @@ export const Views = {
             `;
           }).join('')}
         </div>
-      </div>
-    `;
-  },
-
-  team() {
-    const p = this.current();
-    if (!p) return this.emptyProject();
-    if (State.members.length === 0) {
-      return `
-        <div class="page-title-block"><div class="page-eyebrow">EQUIPE</div><div class="page-title">Membros do Projeto</div></div>
-        <div class="empty-state" style="background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;">
-          <div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-          <div class="empty-state-title">Nenhum membro no projeto</div>
-          <div class="empty-state-sub">Convide usuários por e-mail. Quando aceitarem, entram na equipe e podem receber tarefas.</div>
-          <button class="btn btn-cta" data-action="invite-member">+ Convidar Membro</button>
-        </div>
-      `;
-    }
-    return `
-      <div class="page-title-block"><div class="page-eyebrow">EQUIPE</div><div class="page-title">Membros do Projeto</div><div class="page-subtitle">${State.members.length} ${State.members.length === 1 ? 'pessoa' : 'pessoas'} envolvidas</div></div>
-      <div class="team-grid">
-        ${State.members.map(m => {
-          const tasks = State.tasks.filter(t => t.assignee_id === m.id && !t.inactive);
-          const leadDiscs = State.disciplines.filter(d => d.lead_member_id === m.id).length;
-          const leadSectors = (State.sectors || []).filter(s => s.lead_member_id === m.id).length;
-          const raciCount = State.raci.filter(r => r.member_id === m.id && (r.role === 'R' || r.role === 'A')).length;
-          return `
-            <div class="member-card">
-              <div class="member-avatar-lg" style="background:linear-gradient(135deg, ${colorFromString(m.name)}, ${colorFromString(m.email || m.name)})">${initials(m.name)}</div>
-              <div class="member-name">${escapeHtml(m.name)}</div>
-              <div class="member-role">${escapeHtml(m.role || 'Membro')}</div>
-              <div style="font-size:12px;color:var(--ink-soft);font-family:var(--font-mono);margin-top:6px;">${escapeHtml(m.email || '')}</div>
-              ${m.phone ? `<div style="font-size:12px;color:var(--ink-soft);font-family:var(--font-mono);margin-top:2px;">${escapeHtml(m.phone)}</div>` : ''}
-              <div class="member-stats">
-                <div><div class="member-stat-num">${tasks.length}</div><div class="member-stat-label">Tarefas</div></div>
-                <div><div class="member-stat-num" style="color:var(--accent)">${leadDiscs}</div><div class="member-stat-label">Disciplinas</div></div>
-                <div><div class="member-stat-num" style="color:var(--blueprint)">${leadSectors}</div><div class="member-stat-label">Setores</div></div>
-                <div><div class="member-stat-num" style="color:var(--accent-warm)">${raciCount}</div><div class="member-stat-label">R/A</div></div>
-              </div>
-              ${DB.iAmOwner() ? `
-              <div class="member-actions">
-                ${m.user_id === p.owner_id
-                  ? `<span style="font-family:var(--font-mono);font-size:9px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;">★ dono</span>`
-                  : `<button class="icon-btn danger" data-action="remove-allocation-member" data-id="${m.id}" title="Remover do projeto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`}
-              </div>` : ''}
-            </div>
-          `;
-        }).join('')}
       </div>
     `;
   },

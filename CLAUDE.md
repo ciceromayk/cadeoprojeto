@@ -18,6 +18,8 @@ Sempre que fizer uma correção, melhoria ou preparar um deploy que chegue ao us
   (`app.js` é o ponto de entrada; `helpers`, `state`, `db`, `cpm`, `views`, `ui` etc. — veja o 1º comentário de cada arquivo).
   Ao criar um módulo novo: importe-o de quem o usa e acrescente `<link rel="modulepreload" href="js/<nome>.js">` em
   `app.html` (o teste de integridade confere). Funções usadas em `onclick="..."` inline precisam de `window.X = X`.
+  Telas grandes saem de `UI`/`Views` para `js/screen-<tela>.js`, que se "pluga" com `Object.assign(UI, {...})` /
+  `Object.assign(Views, {...})` (a tela importa `ui.js`/`views.js`, nunca o contrário) e é importada por efeito em `js/app.js`.
   Evite reatribuir (`x = ...`) um `let` exportado por outro módulo: ESM não permite — use um objeto ou um setter.
 - Migrações SQL ficam em `migrations/` e são executadas manualmente no Supabase, em ordem, antes de
   publicar a versão que depende delas. Devem ser idempotentes.

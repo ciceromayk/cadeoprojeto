@@ -1,8 +1,12 @@
 // Versão do app (APP_VERSION) e painel Novidades (CHANGELOG)
 
 // ---------- VERSÃO & CHANGELOG ----------
-export const APP_VERSION = '4.7.5';
+export const APP_VERSION = '4.7.6';
 export const CHANGELOG = [
+  { version: '4.7.6', date: 'nov/2026', title: 'Bastidores: tela Equipe em módulo próprio', items: [
+    'O código da tela Equipe (cards de membros, convites, alocação e edição) saiu dos arquivos gigantes ui.js e views.js e foi para js/screen-team.js, o primeiro passo para dividir o app por tela.',
+    'Nada muda no uso: a tela Equipe funciona exatamente como antes.',
+  ] },
   { version: '4.7.5', date: 'nov/2026', title: 'Código dividido em módulos + correção da origem dos cadastros', items: [
     'Correção: a medição da origem dos cadastros (links /ig, /ig-reels e /ig-dm) voltou a funcionar no cadastro — o trecho havia ficado de fora na versão 4.7.4.',
     'Bastidores: o código do app, que estava num único arquivo de 20 mil linhas, foi dividido em 26 módulos (dados, cronograma, telas, diálogos etc.) em js/, carregados em paralelo.',
