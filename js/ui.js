@@ -1,5 +1,5 @@
 // UI: controlador principal das telas
-import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtBRL, fmtBRLk, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, parentTag, parentTitleOf, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
+import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, parentTag, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
 import { renderCommentBody } from './mentions.js';
 import { CPMCache, autoSchedule, dependencyCycle } from './cpm.js';
 import { friendlyError, setLoading, toast } from './feedback.js';
@@ -6777,95 +6777,6 @@ export const UI = {
     `;
 
     this._printWindow('Avanço Físico (Curva S)', body);
-  },
-
-  printDesembolso() {
-    const p = Views.current();
-    if (!p) { toast('Selecione um projeto', 'warning'); return; }
-    const D = Views._desembolsoData();
-    if (!D.rows.length) { toast('Nenhum custo lançado nas tarefas', 'warning'); return; }
-    const { rows, totalCost, curK, costed } = D;
-    const monthLbl = k => Views.monthLbl(k);
-    const dueMonth = d => Views._dueMonth(d);
-    const tasksByMonth = {};
-    costed.forEach(t => { const k = dueMonth(t.end_date); if (!tasksByMonth[k]) tasksByMonth[k] = []; tasksByMonth[k].push(t); });
-    const pastRows = rows.filter(r => r.isPast);
-    const prevToday = pastRows.length ? pastRows[pastRows.length - 1].accP : 0;
-    const realToday = pastRows.length ? pastRows[pastRows.length - 1].accR : 0;
-    const peak = rows.reduce((a, r) => r.prev > a.prev ? r : a, rows[0]);
-
-    // Curva S (cores fixas p/ impressão)
-    const VW = 920, VH = 300, mL = 70, mR = 16, mT = 14, mB = 26;
-    const pw = VW - mL - mR, ph = VH - mT - mB, n = rows.length;
-    const X = i => mL + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw);
-    const Yc = v => mT + (1 - (totalCost > 0 ? v / totalCost : 0)) * ph;
-    const maxMonth = Math.max(...rows.map(r => r.prev), 1);
-    const barW = Math.min((pw / n) * 0.6, 34);
-    const bars = rows.map((r, i) => { const h = (r.prev / maxMonth) * ph, x = X(i) - barW / 2; return `<rect x="${x.toFixed(1)}" y="${(mT + ph - h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="rgba(31,58,138,0.14)"/>`; }).join('');
-    const prevPts = rows.map((r, i) => `${X(i).toFixed(1)},${Yc(r.accP).toFixed(1)}`).join(' ');
-    const areaPts = `${mL},${(mT + ph).toFixed(1)} ${prevPts} ${X(n - 1).toFixed(1)},${(mT + ph).toFixed(1)}`;
-    const realPts = rows.map((r, i) => r.isPast ? `${X(i).toFixed(1)},${Yc(r.accR).toFixed(1)}` : null).filter(Boolean).join(' ');
-    const yGrid = [0, 25, 50, 75, 100].map(pc => { const v = totalCost * pc / 100, y = Yc(v); return `<line x1="${mL}" y1="${y.toFixed(1)}" x2="${VW - mR}" y2="${y.toFixed(1)}" stroke="#e6e6e6" stroke-width="1"/><text x="${mL - 7}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="8" font-family="monospace" fill="#888">${fmtBRLk(v)}</text>`; }).join('');
-    const xStep = Math.max(1, Math.ceil(n / 14));
-    const xLabels = rows.map((r, i) => ((i % xStep === 0) || (i === n - 1 && (n - 1) % xStep >= 2)) ? `<text x="${X(i).toFixed(1)}" y="${VH - 8}" text-anchor="middle" font-size="8" font-family="monospace" fill="#888">${monthLbl(r.k)}</text>` : '').join('');
-    const curIdx = rows.findIndex(r => r.k === curK);
-    const todayLine = curIdx >= 0 ? `<line x1="${X(curIdx).toFixed(1)}" y1="${mT}" x2="${X(curIdx).toFixed(1)}" y2="${mT + ph}" stroke="#94928b" stroke-width="1" stroke-dasharray="3 3"/><text x="${X(curIdx).toFixed(1)}" y="${mT - 3}" text-anchor="middle" font-size="7" font-family="monospace" fill="#94928b">HOJE</text>` : '';
-
-    const trs = rows.map(r => {
-      const monthTasks = (tasksByMonth[r.k] || []).sort((a, b) => (a.end_date || '').localeCompare(b.end_date || ''));
-      const taskSubrows = monthTasks.map(t => {
-        const c = parseFloat(t.cost) || 0;
-        const real = r.isPast ? c * Math.min(100, Math.max(0, parseFloat(t.progress) || 0)) / 100 : null;
-        const parentTitle = parentTitleOf(t);
-        return `<tr style="background:#f7f6f2;">
-          <td style="padding:3px 10px 3px 22px;font-size:10px;color:#555;">${escapeHtml(t.title)}${parentTitle ? `<span style="font-size:9px;color:#888;margin-left:6px;">↳ ${escapeHtml(parentTitle)}</span>` : ''}</td>
-          <td style="text-align:right;font-family:monospace;font-size:10px;">${fmtBRL(c)}</td>
-          <td style="text-align:right;font-family:monospace;font-size:10px;color:#c13b12;">${real !== null && real > 0 ? fmtBRL(real) : ''}</td>
-          <td colspan="2"></td>
-        </tr>`;
-      }).join('');
-      return `<tr${r.k === curK ? ' style="background:#fff6f0;"' : ''}>
-        <td style="font-family:monospace;">${monthLbl(r.k)}</td>
-        <td style="text-align:right;font-family:monospace;">${r.prev > 0 ? fmtBRL(r.prev) : '—'}</td>
-        <td style="text-align:right;font-family:monospace;color:#c13b12;">${r.isPast ? (r.real > 0 ? fmtBRL(r.real) : '—') : ''}</td>
-        <td style="text-align:right;font-family:monospace;font-weight:600;">${fmtBRL(r.accP)}</td>
-        <td style="text-align:right;font-family:monospace;color:#888;">${r.pct.toFixed(0)}%</td>
-      </tr>${taskSubrows}`;
-    }).join('');
-    const kpiBox = (l, v) => `<div style="text-align:center;"><strong>${v}</strong><br><span style="color:#888;font-size:9px;">${l}</span></div>`;
-
-    const body = `
-      <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:10px;">
-        <div style="flex:1;"><h2 style="margin:0 0 4px 0;">${escapeHtml(p.name)}</h2>
-          <div style="font-size:10px;color:#666;">Fluxo de Desembolso · medição (até dia 20: mesmo mês; após dia 20: dia 05 do mês seguinte) · Emitido em ${new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</div></div>
-        <div style="display:flex;gap:16px;font-family:monospace;font-size:11px;">
-          ${kpiBox('custo total', fmtBRL(totalCost))}${kpiBox('previsto até hoje', fmtBRL(prevToday))}${kpiBox('realizado até hoje', fmtBRL(realToday))}
-        </div>
-      </div>
-      <div style="display:flex;gap:14px;align-items:center;margin:4px 0 8px;font-size:10px;color:#444;font-family:monospace;">
-        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:16px;border-top:3px solid #1f3a8a;display:inline-block;"></span>Previsto</span>
-        <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:16px;border-top:3px solid #e54b1a;display:inline-block;"></span>Realizado</span>
-        <span style="margin-left:auto;color:#888;">Pico mensal: ${fmtBRL(peak.prev)} (${monthLbl(peak.k)})</span>
-      </div>
-      <svg viewBox="0 0 ${VW} ${VH}" width="100%" style="display:block;border:1px solid #e0e0e0;border-radius:3px;background:#fff;">
-        ${yGrid}${bars}
-        <polygon points="${areaPts}" fill="rgba(31,58,138,0.05)"/>
-        <polyline points="${prevPts}" fill="none" stroke="#1f3a8a" stroke-width="2"/>
-        ${realPts ? `<polyline points="${realPts}" fill="none" stroke="#e54b1a" stroke-width="2"/>` : ''}
-        ${todayLine}${xLabels}
-      </svg>
-      <h2 style="margin:16px 0 4px;">Desembolso mensal</h2>
-      <table>
-        <thead><tr><th>Mês</th><th style="text-align:right;">Previsto (mês)</th><th style="text-align:right;">Realizado (mês)</th><th style="text-align:right;">Acum. previsto</th><th style="text-align:right;">%</th></tr></thead>
-        <tbody>${trs}</tbody>
-        <tfoot><tr style="font-weight:700;border-top:2px solid #ccc;">
-          <td style="font-family:monospace;">TOTAL</td>
-          <td style="text-align:right;font-family:monospace;">${fmtBRL(totalCost)}</td>
-          <td style="text-align:right;font-family:monospace;color:#c13b12;">${fmtBRL(realToday)}</td>
-          <td></td><td style="text-align:right;">100%</td>
-        </tr></tfoot>
-      </table>`;
-    this._printWindow('Relatório de Desembolso', body);
   },
 
   // ============================================================================
