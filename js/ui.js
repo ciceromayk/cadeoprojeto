@@ -1,11 +1,11 @@
 // UI: controlador principal das telas
-import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
+import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
 import { renderCommentBody } from './mentions.js';
 import { CPMCache, autoSchedule, dependencyCycle } from './cpm.js';
 import { friendlyError, setLoading, toast } from './feedback.js';
 import { APP_VERSION, CHANGELOG } from './changelog.js';
 import { CONSTRAINT_TYPES, DELAY_CAUSES, PPC_CAUSES, RESTRICTION_STATUS, State, validateTaskStatusChange } from './state.js';
-import { Auth, Config } from './auth.js';
+import { Config } from './auth.js';
 import { _EAP_BUILTINS } from './eap-templates.js';
 import { DB, setupRealtime } from './db.js';
 import { Perf } from './perf.js';
@@ -5457,154 +5457,6 @@ export const UI = {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   },
 
-  async exportData() {
-    setLoading(true);
-    try {
-      const dateStr = today();
-      const email = (State.user?.email || 'user').replace(/[^a-z0-9]/gi, '_');
-
-      // ── 1. Coleta todos os projetos ──────────────────────────────────────────
-      const out = {
-        format: 'cadeoprojeto-backup', version: 2,
-        exported_at: new Date().toISOString(),
-        user: State.user?.email,
-        holidays: Holidays.load(),
-        projects: [],
-      };
-      for (const proj of State.projects) {
-        out.projects.push(await DB.exportProjectFull(proj.id));
-      }
-      const totalTasks = out.projects.reduce((s, p) => s + (p.tasks?.length || 0), 0);
-
-      // ── 2. JSON ───────────────────────────────────────────────────────────────
-      this._dlBlob(
-        new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }),
-        `cadeoprojeto-backup-${email}-${dateStr}.json`
-      );
-
-      // ── 3. Excel (.xlsx via SheetJS CDN) ─────────────────────────────────────
-      await new Promise((resolve, reject) => {
-        if (window.XLSX) { resolve(); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        // SRI: garante que o script do CDN não foi adulterado
-        s.integrity = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
-        s.crossOrigin = 'anonymous';
-        s.onload = resolve; s.onerror = reject;
-        document.head.appendChild(s);
-      });
-      const wb = window.XLSX.utils.book_new();
-      for (const pd of out.projects) {
-        const proj = pd.project || {};
-        const rows = (pd.tasks || []).map(tk => ({
-          Código: tk.code || '',
-          Título: tk.title || '',
-          Status: tk.status || '',
-          Prioridade: tk.priority || '',
-          Início: tk.start_date || '',
-          Término: tk.end_date || '',
-          'Progresso (%)': parseFloat(tk.progress) || 0,
-          'Custo Previsto (R$)': tk.cost || '',
-          Responsável: (State.teamMembers || []).find(m => m.id === tk.assignee_id)?.name || '',
-          Disciplina: (State.disciplines || []).find(d => d.id === tk.discipline_id)?.name || '',
-          Setor: tk.sector || '',
-          Marco: tk.is_milestone ? 'Sim' : 'Não',
-        }));
-        if (rows.length > 0) {
-          const ws = window.XLSX.utils.json_to_sheet(rows);
-          const sheetName = (proj.name || 'Projeto').replace(/[\\\/\?\*\[\]:]/g, '_').slice(0, 31);
-          window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
-        }
-      }
-      if (wb.SheetNames.length > 0) {
-        const xlsxBuffer = window.XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        this._dlBlob(
-          new Blob([xlsxBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-          `cadeoprojeto-tarefas-${email}-${dateStr}.xlsx`
-        );
-      }
-
-      // ── 4. MS Project XML (projeto atual) ────────────────────────────────────
-      if (State.tasks.length > 0 && window.MSPX) {
-        const project = Views.current();
-        const xml = MSPX.serialize(project, State.tasks, State.dependencies, State.members || State.teamMembers || []);
-        const safeName = (project?.name || 'projeto').replace(/[^a-z0-9]/gi, '_');
-        this._dlBlob(
-          new Blob([xml], { type: 'application/xml' }),
-          `cadeoprojeto-msproject-${safeName}-${dateStr}.xml`
-        );
-      }
-
-      toast(`Backup exportado · ${out.projects.length} projeto(s), ${totalTasks} tarefas · JSON + Excel + XML`, 'success');
-    } catch (err) { console.error(err); toast('Erro ao exportar: ' + err.message, 'error'); }
-    finally { setLoading(false); }
-  },
-
-  importData() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      let parsed;
-      try { parsed = JSON.parse(await file.text()); }
-      catch (err) { toast('Arquivo JSON inválido', 'error'); return; }
-      const projects = parsed.projects || [];
-      if (!Array.isArray(projects) || projects.length === 0) { toast('Nenhum projeto encontrado no arquivo', 'error'); return; }
-      const isV2 = parsed.format === 'cadeoprojeto-backup' || projects[0]?.tasks !== undefined;
-      // Modal de confirmação
-      const rows = projects.map((p, i) => {
-        const pr = p.project || p;
-        const nt = (p.tasks || []).length;
-        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;">
-          <input type="checkbox" class="imp-proj-chk" data-idx="${i}" checked>
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(pr.name || 'Projeto ' + (i + 1))}</div>
-            <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-mute);">${nt} tarefas · ${(p.disciplines || []).length} disc · ${(p.restrictions || []).length} restr · ${(p.dependencies || []).length} dep</div>
-          </div>
-        </label>`;
-      }).join('');
-      Modal.open({
-        title: 'Importar backup',
-        cls: 'modal-wide',
-        body: `
-          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:12px;">
-            Cada projeto selecionado será recriado como um <strong>novo projeto</strong> (sufixo "(importado)"), sem afetar os existentes.
-            ${!isV2 ? '<br><span style="color:var(--accent-warm);">⚠ Arquivo de formato antigo: dependências, restrições, RACI e Last Planner podem não estar incluídos.</span>' : ''}
-          </div>
-          <div style="max-height:46vh;overflow-y:auto;border:1px solid var(--border);border-radius:4px;">${rows}</div>
-          <div style="font-size:11px;color:var(--ink-mute);margin-top:8px;">Comentários são reatribuídos a você. Responsáveis/líderes são mantidos só se o membro existir na sua conta.</div>
-        `,
-        footer: `<button class="btn btn-secondary" id="btnCancelImport">Cancelar</button><button class="btn btn-cta" id="btnConfirmImport">Importar selecionados</button>`,
-      });
-      $('#btnCancelImport').onclick = () => Modal.close();
-      $('#btnConfirmImport').onclick = async () => {
-        const idxs = [...document.querySelectorAll('.imp-proj-chk:checked')].map(c => parseInt(c.dataset.idx));
-        if (idxs.length === 0) { toast('Selecione ao menos um projeto', 'error'); return; }
-        Modal.close();
-        setLoading(true);
-        let ok = 0, fail = 0;
-        for (const i of idxs) {
-          try {
-            await DB.importProjectFull(projects[i]);
-            ok++;
-          } catch (err) { console.error('import falhou:', err); fail++; }
-        }
-        // Recarrega lista de projetos e abre o último importado
-        try {
-          State.projects = await DB.listProjects();
-          if (State.projects[0]) { State.currentProjectId = State.projects[0].id; await DB.loadCurrentProject(); setupRealtime(); }
-        } catch (e) { console.warn('[import] recarga pós-importação falhou:', e.message); }
-        State.currentView = 'projects'; UI.setActiveNav('projects');
-        await UI.render();
-        setLoading(false);
-        toast(`Importação concluída · ${ok} projeto(s)${fail ? `, ${fail} falha(s)` : ''}`, fail ? 'warning' : 'success');
-      };
-    };
-    input.click();
-  },
-
   // ── helpers de impressão ──────────────────────────────────────────────────
   _printWindow(title, bodyHtml, landscape = false) {
     const p = Views.current();
@@ -6530,46 +6382,6 @@ export const UI = {
       UI.render();
       toast('Colunas salvas', 'success');
     };
-  },
-
-  async confirmDeleteAccount() {
-    const step1 = await Dialog.confirm({ title: '⚠ Excluir conta', msg: 'Esta ação é IRREVERSÍVEL.\n\nSerão excluídos permanentemente:\n• Todos os seus projetos\n• Todas as tarefas e entregáveis\n• Todos os membros de equipe cadastrados\n• Todas as disciplinas, RACI, aprovações', confirmText: 'Continuar', danger: true });
-    if (!step1) return;
-    const step2 = await Dialog.confirm({ title: 'Confirmação final', msg: 'Para excluir sua conta de forma permanente, digite a palavra abaixo:', confirmText: 'Excluir minha conta', danger: true, requireType: 'EXCLUIR' });
-    if (!step2) { toast('Exclusão cancelada', 'warning'); return; }
-
-    setLoading(true);
-    try {
-      const sb = State.supabase;
-      const uid = State.user.id;
-      // Apaga dados na ordem correta (cascata via FK, mas garantindo)
-      // 1. Tarefas e dependências (cascade do projeto)
-      // 2. Entregáveis, RACI, aprovações (cascade)
-      // 3. Projetos (cascade para tudo acima via ON DELETE CASCADE)
-      for (const proj of State.projects) {
-        await sb.from('tasks').delete().eq('project_id', proj.id);
-        await sb.from('restrictions').delete().eq('project_id', proj.id);
-        await sb.from('disciplines').delete().eq('project_id', proj.id);
-        await sb.from('project_allocations').delete().eq('project_id', proj.id);
-        await sb.from('projects').delete().eq('id', proj.id);
-      }
-      // 4. Membros globais de equipe
-      await sb.from('team_members').delete().eq('owner_id', uid);
-      // 5. Chama RPC para deletar o próprio usuário (requer a migration de segurança)
-      const { error: rpcError } = await sb.rpc('delete_my_account');
-      if (rpcError) {
-        // Se a função não existir ainda, apenas desloga e avisa
-        toast('Dados excluídos. Execute o SQL "14-lgpd-delete-account.sql" para completar a exclusão do login.', 'warning');
-      } else {
-        toast('Conta excluída com sucesso', 'success');
-      }
-      await Auth.signOut();
-      setTimeout(() => location.reload(), 1500);
-    } catch (err) {
-      toast('Erro ao excluir: ' + err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
   },
 
 };
