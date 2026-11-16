@@ -2,7 +2,7 @@
 import { $, DEP_TYPE_PT, DateFilter, Holidays, SITUACAO_META, _parseYMD, _wdBetweenCache, addDays, addWeeks, colorFromString, daysBetween, escapeHtml, fmtBRL, fmtDate, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, parentTag, physicalProgress, plannedProgressPct, relativeDate, statusFilterChips, taskSituacao, today, weekRangeLabel, workingDaysBetween } from './helpers.js';
 import { CPMCache, computeCriticalPath } from './cpm.js';
 import { setLoading, toast } from './feedback.js';
-import { COMMITMENT_STATUS, CONSTRAINT_TYPES, DELAY_CAUSES, PPC_CAUSES, RACI_LABELS, RESTRICTION_STATUS, RESTRICTION_TYPES, STATUS_LABELS, State } from './state.js';
+import { COMMITMENT_STATUS, CONSTRAINT_TYPES, DELAY_CAUSES, PPC_CAUSES, RESTRICTION_STATUS, RESTRICTION_TYPES, State } from './state.js';
 import { DB } from './db.js';
 import { Perf } from './perf.js';
 import { HealthCheck } from './health.js';
@@ -3101,99 +3101,6 @@ export const Views = {
           ? `<button class="btn btn-ghost lp-undo-btn" data-action="lp-uncommit" data-id="${commit.id}" title="Clique para tirar do plano semanal" style="width:100%;margin-top:7px;padding:4px;font-size:10px;color:var(--accent-success);">✓ comprometida · <span style="opacity:.85;">↩ tirar do plano</span></button>`
           : `<button class="btn btn-ghost" data-action="lp-commit" data-id="${t.id}" data-week="${wk}" style="width:100%;margin-top:7px;padding:4px;font-size:10px;">+ Comprometer</button>`}
       </div>`;
-  },
-
-  raci() {
-    const p = this.current();
-    if (!p) return this.emptyProject();
-
-    if (State.tasks.length === 0) {
-      return `
-        <div class="page-title-block"><div class="page-eyebrow">PROJETO · RACI</div><div class="page-title">Matriz RACI</div></div>
-        <div class="empty-state" style="background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;">
-          <div class="empty-state-title">Cadastre tarefas primeiro</div>
-          <div class="empty-state-sub">A matriz RACI define <strong>quem é Responsável, Aprovador, Consultado e Informado</strong> para cada tarefa do projeto.</div>
-          <button class="btn btn-cta" data-action="goto-tasks">Ir para Tarefas</button>
-        </div>
-      `;
-    }
-
-    if (State.members.length === 0) {
-      return `
-        <div class="page-title-block"><div class="page-eyebrow">PROJETO · RACI</div><div class="page-title">Matriz RACI</div></div>
-        <div class="empty-state" style="background:var(--bg-panel);border:1px solid var(--border);border-radius:3px;">
-          <div class="empty-state-title">Adicione membros à equipe</div>
-          <div class="empty-state-sub">É preciso ter pessoas cadastradas para atribuir papéis RACI.</div>
-        </div>
-      `;
-    }
-
-    const tks = State.tasks.filter(t => !t.inactive);
-
-    // Índice deliverable_id → member_id → roles[], montado uma vez (evita filter() O(T×M×R) por célula)
-    const raciIdx = new Map();
-    State.raci.forEach(x => {
-      if (!raciIdx.has(x.deliverable_id)) raciIdx.set(x.deliverable_id, new Map());
-      const byMember = raciIdx.get(x.deliverable_id);
-      if (!byMember.has(x.member_id)) byMember.set(x.member_id, []);
-      byMember.get(x.member_id).push(x.role);
-    });
-
-    return `
-      <div class="page-title-block">
-        <div class="page-eyebrow">PROJETO · RACI</div>
-        <div class="page-title">Matriz de Responsabilidade</div>
-        <div class="page-subtitle">Clique em qualquer célula para atribuir/remover papéis. <strong>R</strong>esponsável (resolve), <strong>A</strong>provador (decide), <strong>C</strong>onsultado, <strong>I</strong>nformado.</div>
-      </div>
-
-      <div class="raci-legend">
-        <div class="raci-legend-item"><span class="raci-pill R">R</span> <span>Responsible — quem resolve</span></div>
-        <div class="raci-legend-item"><span class="raci-pill A">A</span> <span>Accountable — decisão final</span></div>
-        <div class="raci-legend-item"><span class="raci-pill C">C</span> <span>Consulted — fornece input</span></div>
-        <div class="raci-legend-item"><span class="raci-pill I">I</span> <span>Informed — recebe atualizações</span></div>
-      </div>
-
-      <div class="filter-bar">
-        <span class="filter-count">${tks.length} ${tks.length === 1 ? 'tarefa' : 'tarefas'} · ${State.members.length} ${State.members.length === 1 ? 'pessoa' : 'pessoas'}</span>
-      </div>
-
-      <div class="panel" style="padding:0;">
-        <div style="overflow-x:auto;max-height:calc(100vh - 360px);overflow-y:auto;">
-          <table class="raci-table">
-            <thead>
-              <tr>
-                <th class="col-deliverable">Tarefa</th>
-                ${State.members.map(m => `<th title="${escapeHtml(m.name)}"><div style="font-size:10px;line-height:1.2;">${escapeHtml(m.name.split(' ')[0])}</div><div style="font-size:9px;color:var(--ink-mute);font-weight:400;">${escapeHtml((m.role || '').slice(0, 16))}</div></th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${tks.map(t => {
-                const stLabel = STATUS_LABELS[t.status] || t.status;
-                return `
-                  <tr>
-                    <td class="col-deliverable">
-                      <div style="font-family:var(--font-mono);font-size:10px;color:var(--accent);">${escapeHtml(t.code || '')}</div>
-                      <div style="font-size:13px;font-weight:600;margin-top:2px;line-height:1.3;">${escapeHtml(t.title)}</div>
-                      <span style="font-size:9px;font-weight:700;color:var(--ink-mute);">${escapeHtml(stLabel)}</span>
-                    </td>
-                    ${State.members.map(m => {
-                      const roles = (raciIdx.get(t.id)?.get(m.id) || []).slice().sort();
-                      return `
-                        <td class="raci-cell" data-action="toggle-raci" data-task="${t.id}" data-member="${m.id}">
-                          ${roles.length > 0
-                            ? roles.map(role => `<span class="raci-pill ${role}" title="${RACI_LABELS[role]}">${role}</span>`).join(' ')
-                            : '<span class="raci-empty">·</span>'}
-                        </td>
-                      `;
-                    }).join('')}
-                  </tr>
-                `;
-              }).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
   },
 
   projects() {
