@@ -1,5 +1,5 @@
 // UI: controlador principal das telas
-import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, parentTag, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
+import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
 import { renderCommentBody } from './mentions.js';
 import { CPMCache, autoSchedule, dependencyCycle } from './cpm.js';
 import { friendlyError, setLoading, toast } from './feedback.js';
@@ -5538,38 +5538,6 @@ export const UI = {
     } catch (err) { toast('Erro ao recusar: ' + err.message, 'error'); }
   },
 
-  addHoliday() {
-    const dateInput = document.getElementById('holidayDateInput');
-    const endInput = document.getElementById('holidayEndInput');
-    const nameInput = document.getElementById('holidayNameInput');
-    const date = dateInput?.value;
-    const end = endInput?.value || null;
-    const name = nameInput?.value?.trim();
-    if (!date) { toast('Selecione uma data', 'error'); return; }
-    if (end && end < date) { toast('O término não pode ser antes do início', 'error'); return; }
-    const list = Holidays.load();
-    if (list.some(h => h.date === date)) { toast('Data já cadastrada', 'warning'); return; }
-    const entry = { date, name: name || date };
-    if (end && end > date) entry.end = end;
-    list.push(entry);
-    Holidays.save(list);
-    toast(entry.end ? `Período adicionado: ${date} → ${end}` : `Feriado adicionado: ${date}`, 'success');
-    if (dateInput) dateInput.value = '';
-    if (endInput) endInput.value = '';
-    if (nameInput) nameInput.value = '';
-    // Atualiza lista sem re-render completo
-    const listEl = document.getElementById('holidayList');
-    if (listEl) listEl.innerHTML = Holidays.listHtml();
-  },
-
-  removeHoliday(date) {
-    let list = Holidays.load().filter(h => h.date !== date);
-    Holidays.save(list);
-    toast('Feriado removido', 'success');
-    const listEl = document.getElementById('holidayList');
-    if (listEl) listEl.innerHTML = Holidays.listHtml();
-  },
-
   _dlBlob(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -6900,62 +6868,6 @@ export const UI = {
     } finally {
       setLoading(false);
     }
-  },
-
-  // Calendário: abre todas as tarefas de um dia (modal)
-  openCalendarDay(dateStr) {
-    if (!dateStr) return;
-    const allTasks = (State.allTasks.length > 0 ? State.allTasks : State.tasks).filter(t => !t.inactive);
-    const fd = State.calendarDiscFilter, fp = State.calendarProjFilter;
-    let tasks = allTasks.filter(t => t.start_date && t.end_date && t.start_date <= dateStr && t.end_date >= dateStr);
-    if (fd) tasks = tasks.filter(t => t.discipline_id === fd);
-    if (fp) tasks = tasks.filter(t => t.project_id === fp);
-    const starting = tasks.filter(t => t.start_date === dateStr);
-    const ending   = tasks.filter(t => t.end_date === dateStr && t.start_date !== dateStr);
-    const spanning = tasks.filter(t => t.start_date < dateStr && t.end_date > dateStr);
-    const total = tasks.length;
-    const multiProj = State.projects.length > 1;
-    const dt = new Date(dateStr + 'T00:00:00');
-    let dateLbl = dt.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-    dateLbl = dateLbl.charAt(0).toUpperCase() + dateLbl.slice(1);
-
-    const row = (t, tag, color) => {
-      const disc = State.disciplines.find(d => d.id === t.discipline_id);
-      const member = State.members.find(m => m.id === t.assignee_id) || (State.teamMembers || []).find(m => m.id === t.assignee_id);
-      const proj = multiProj ? State.projects.find(p => p.id === t.project_id) : null;
-      const overdue = t.end_date < today() && t.status !== 'concluido';
-      const meta = [t.code, proj && proj.name, disc && disc.code, member && member.name.split(' ')[0]].filter(Boolean).map(escapeHtml).join(' · ');
-      return `<div class="cal-day-row" data-id="${t.id}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;">
-        <span style="width:4px;align-self:stretch;min-height:26px;border-radius:2px;background:${color};flex-shrink:0;"></span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(t.title)}</div>
-          <div style="font-family:var(--font-mono);font-size:10px;color:var(--ink-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${meta}</div>
-          ${parentTag(t)}
-        </div>
-        <span style="font-family:var(--font-mono);font-size:10px;font-weight:700;color:${color};white-space:nowrap;">${tag}</span>
-        ${overdue ? '<span style="font-family:var(--font-mono);font-size:9px;color:var(--accent-danger);">atrasada</span>' : ''}
-      </div>`;
-    };
-    const section = (title, arr, tag, color) => arr.length
-      ? `<div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-mute);padding:10px 10px 4px;">${title} · ${arr.length}</div>${arr.map(t => row(t, tag, color)).join('')}`
-      : '';
-
-    const body = total === 0
-      ? `<div class="empty-state" style="padding:30px 20px;"><div class="empty-state-sub">Nenhuma tarefa neste dia.</div></div>`
-      : `<div style="font-size:12px;color:var(--ink-mute);margin-bottom:8px;">${total} tarefa${total !== 1 ? 's' : ''} neste dia · clique para abrir</div>
-         <div style="max-height:60vh;overflow:auto;border:1px solid var(--border);border-radius:3px;">
-           ${section('Iniciam', starting, '▶ início', 'var(--blueprint)')}
-           ${section('Terminam (prazo)', ending, '● prazo', 'var(--accent)')}
-           ${section('Em andamento', spanning, '— atravessa', 'var(--ink-mute)')}
-         </div>`;
-
-    Modal.open({
-      title: dateLbl,
-      cls: 'modal-wide',
-      body,
-      footer: `<button type="button" class="btn btn-secondary" onclick="Modal.close()">Fechar</button>`
-    });
-    $$('.cal-day-row').forEach(r => { r.onclick = () => { Modal.close(); UI.openTaskModal(r.dataset.id); }; });
   },
 
 };
