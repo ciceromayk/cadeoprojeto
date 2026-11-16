@@ -5,6 +5,7 @@ import './screen-disciplines.js';
 import './screen-sectors.js';
 import './screen-restrictions.js';
 import './screen-raci.js';
+import './screen-lastplanner.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { $, $$, _parseYMD, addDays, addWorkingDays, daysBetween, escapeHtml, forecastEndDate, isWorkingDay, parentTag, parentTitleOf, physicalProgress, today, workingDaysBetween } from './helpers.js';
 import { autoSchedule, computeCriticalPath } from './cpm.js';

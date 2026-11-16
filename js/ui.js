@@ -1,5 +1,5 @@
 // UI: controlador principal das telas
-import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtBRL, fmtBRLk, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, parentTag, parentTitleOf, physicalProgress, rolledProgress, snapTaskDates, today, weekRangeLabel, workingDaysBetween } from './helpers.js';
+import { $, $$, DEP_TYPE_FROM_PT, DEP_TYPE_PT, DateFilter, Holidays, addDays, addWeeks, addWorkingDays, colorFromString, daysBetween, escapeHtml, fmtBRL, fmtBRLk, fmtDateFull, fmtDateShort, forecastEndDate, initials, mondayOf, nextWorkday, parentTag, parentTitleOf, physicalProgress, rolledProgress, snapTaskDates, today, workingDaysBetween } from './helpers.js';
 import { renderCommentBody } from './mentions.js';
 import { CPMCache, autoSchedule, dependencyCycle } from './cpm.js';
 import { friendlyError, setLoading, toast } from './feedback.js';
@@ -5063,111 +5063,6 @@ export const UI = {
       await UI.render();
     } catch (err) { toast(friendlyError(err), 'error'); }
     finally { setLoading(false); }
-  },
-
-  // ===== LAST PLANNER — ações =====
-  async lpCommitTask(taskId, week) {
-    if (!taskId || !week) return;
-    // Last Planner: comentaristas também podem comprometer tarefas (planejamento semanal)
-    if (!DB.iCanComment()) { toast('Você não tem permissão neste projeto', 'error'); return; }
-    if ((State.weeklyCommitments || []).some(c => c.task_id === taskId && c.week_start === week)) {
-      toast('Tarefa já comprometida nesta semana', 'info'); return;
-    }
-    const t = State.tasks.find(x => x.id === taskId);
-    try {
-      const c = await DB.createWeeklyCommitment(State.currentProjectId, {
-        task_id: taskId, week_start: week, responsible_id: t?.assignee_id || null, status: 'pendente'
-      });
-      State.weeklyCommitments.push(c);
-      toast('Tarefa comprometida', 'success');
-      UI.render();
-    } catch (err) {
-      if (/weekly_commitments|schema cache|does not exist|relation|column/i.test(err.message || '')) {
-        toast('Tabela do Last Planner ausente — rode o 17-migration-v4.3-lastplanner.sql no Supabase.', 'error');
-      } else { toast('Erro ao comprometer: ' + err.message, 'error'); }
-    }
-  },
-  async lpUncommit(id) {
-    const c = (State.weeklyCommitments || []).find(x => x.id === id);
-    const t = c ? State.tasks.find(tk => tk.id === c.task_id) : null;
-    const nome = t ? `"${t.title}"` : 'esta tarefa';
-    if (!await Dialog.confirm({
-      title: 'Tirar do plano semanal',
-      msg: `A tarefa ${nome} será removida do plano semanal e deixará de estar comprometida nesta semana.\n\nDeseja continuar?`,
-      confirmText: 'Tirar do plano'
-    })) return;
-    try {
-      await DB.deleteWeeklyCommitment(id);
-      State.weeklyCommitments = State.weeklyCommitments.filter(c => c.id !== id);
-      UI.render();
-      toast('Tarefa removida do plano semanal', 'success');
-    } catch (err) { toast('Erro ao remover: ' + err.message, 'error'); }
-  },
-  async lpMark(id, status) {
-    const c = (State.weeklyCommitments || []).find(x => x.id === id);
-    if (!c) return;
-    const newStatus = c.status === status ? 'pendente' : status;
-    const patch = { status: newStatus };
-    if (newStatus !== 'nao_cumprido') patch.cause = null;
-    try {
-      await DB.updateWeeklyCommitment(id, patch);
-      Object.assign(c, patch);
-      UI.render();
-    } catch (err) { toast('Erro ao atualizar: ' + err.message, 'error'); }
-  },
-  async lpSetCause(id, cause) {
-    const c = (State.weeklyCommitments || []).find(x => x.id === id);
-    if (!c) return;
-    try {
-      await DB.updateWeeklyCommitment(id, { cause: cause || null });
-      c.cause = cause || null;
-    } catch (err) { toast('Erro ao salvar causa: ' + err.message, 'error'); }
-  },
-  openCommitPicker() {
-    const wk = State.lpWeekStart || mondayOf(today());
-    const isLeaf = (t) => !State.tasks.some(x => x.parent_id === t.id);
-    const committedIds = new Set((State.weeklyCommitments || []).filter(c => c.week_start === wk).map(c => c.task_id));
-    const candidates = State.tasks
-      .filter(t => isLeaf(t) && t.status !== 'concluido' && !committedIds.has(t.id))
-      .sort((a, b) => String(a.end_date || '9999').localeCompare(String(b.end_date || '9999')));
-    const rowHtml = (t) => {
-      const rest = Views.lpRestrictionFor(t.id);
-      return `<div class="commit-pick-row" data-pick-id="${t.id}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
-        <span style="font-family:var(--font-mono);font-size:10px;color:var(--accent);flex-shrink:0;">${t.code}</span>
-        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.title)} ${rest ? '<span style="font-size:9px;color:var(--accent-danger);">🔒</span>' : ''}${parentTag(t, null, 'inline')}</span>
-        <span style="font-family:var(--font-mono);font-size:10px;color:var(--ink-mute);flex-shrink:0;">${t.end_date ? fmtDateShort(t.end_date) : '—'}</span>
-        <span class="btn btn-ghost" style="padding:2px 8px;font-size:11px;flex-shrink:0;">+ Add</span>
-      </div>`;
-    };
-    const body = `
-      <div style="margin-bottom:10px;font-size:12px;color:var(--ink-mute);">Semana de <strong>${weekRangeLabel(wk)}</strong> — escolha tarefas para comprometer.</div>
-      <input id="commitPickSearch" class="form-input" placeholder="Buscar tarefa…" style="width:100%;margin-bottom:10px;font-size:12px;padding:6px 10px;">
-      <div id="commitPickList" style="max-height:50vh;overflow-y:auto;border:1px solid var(--border);border-radius:4px;">
-        ${candidates.length === 0 ? '<div style="padding:20px;text-align:center;color:var(--ink-mute);font-size:12px;">Nenhuma tarefa livre para comprometer.</div>' : candidates.map(rowHtml).join('')}
-      </div>`;
-    Modal.open({ title: 'Comprometer tarefas', body, footer: '<button class="btn btn-secondary" onclick="Modal.close()">Fechar</button>', cls: 'modal-wide' });
-    setTimeout(() => {
-      const search = document.getElementById('commitPickSearch');
-      const list = document.getElementById('commitPickList');
-      if (search && list) {
-        search.oninput = () => {
-          const q = search.value.toLowerCase();
-          list.querySelectorAll('.commit-pick-row').forEach(row => {
-            const t = State.tasks.find(x => x.id === row.dataset.pickId);
-            const show = !q || (t && (((t.title || '').toLowerCase().includes(q)) || ((t.code || '').toLowerCase().includes(q))));
-            row.style.display = show ? '' : 'none';
-          });
-        };
-      }
-      if (list) {
-        list.onclick = async (e) => {
-          const row = e.target.closest('.commit-pick-row');
-          if (!row) return;
-          await this.lpCommitTask(row.dataset.pickId, wk);
-          row.remove();
-        };
-      }
-    }, 30);
   },
 
   // ===== EDIÇÃO INLINE NAS COLUNAS DO GANTT =====
