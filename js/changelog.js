@@ -1,8 +1,12 @@
 // Versão do app (APP_VERSION) e painel Novidades (CHANGELOG)
 
 // ---------- VERSÃO & CHANGELOG ----------
-export const APP_VERSION = '4.7.6';
+export const APP_VERSION = '4.7.7';
 export const CHANGELOG = [
+  { version: '4.7.7', date: 'nov/2026', title: 'Bastidores: telas principais em módulos próprios', items: [
+    'O código do Dashboard, Cronograma (Gantt), Tarefas, Linhas de base, modal de tarefa, modelos de EAP e importação/exportação saiu dos arquivos gigantes e foi para módulos próprios (js/screen-*.js). O ui.js caiu de 5,7 mil para 1,2 mil linhas e o views.js de 2,6 mil para 66.',
+    'Nada muda no uso: as telas funcionam exatamente como antes.',
+  ] },
   { version: '4.7.6', date: 'nov/2026', title: 'Bastidores: telas em módulos próprios', items: [
     'O código de 12 telas (Equipe, Disciplinas, Setores, Restrições, RACI, Last Planner, Desembolso, Pendências, Calendário, Notificações, Relatório, Saúde, Configurações, Projetos e Permissões) saiu dos arquivos gigantes ui.js e views.js e foi para módulos próprios (js/screen-*.js). O ui.js caiu de 8,9 mil para 5,7 mil linhas e o views.js de 5 mil para 2,6 mil.',
     'Nada muda no uso: as telas funcionam exatamente como antes. Dashboard, Cronograma (Gantt), Tarefas e Linhas de base ficam para uma próxima etapa.',
