@@ -3,9 +3,9 @@
 // ---------- VERSÃO & CHANGELOG ----------
 export const APP_VERSION = '4.7.6';
 export const CHANGELOG = [
-  { version: '4.7.6', date: 'nov/2026', title: 'Bastidores: tela Equipe em módulo próprio', items: [
-    'O código da tela Equipe (cards de membros, convites, alocação e edição) saiu dos arquivos gigantes ui.js e views.js e foi para js/screen-team.js, o primeiro passo para dividir o app por tela.',
-    'Nada muda no uso: a tela Equipe funciona exatamente como antes.',
+  { version: '4.7.6', date: 'nov/2026', title: 'Bastidores: telas em módulos próprios', items: [
+    'O código de 12 telas (Equipe, Disciplinas, Setores, Restrições, RACI, Last Planner, Desembolso, Pendências, Calendário, Notificações, Relatório, Saúde, Configurações, Projetos e Permissões) saiu dos arquivos gigantes ui.js e views.js e foi para módulos próprios (js/screen-*.js). O ui.js caiu de 8,9 mil para 5,7 mil linhas e o views.js de 5 mil para 2,6 mil.',
+    'Nada muda no uso: as telas funcionam exatamente como antes. Dashboard, Cronograma (Gantt), Tarefas e Linhas de base ficam para uma próxima etapa.',
   ] },
   { version: '4.7.5', date: 'nov/2026', title: 'Código dividido em módulos + correção da origem dos cadastros', items: [
     'Correção: a medição da origem dos cadastros (links /ig, /ig-reels e /ig-dm) voltou a funcionar no cadastro — o trecho havia ficado de fora na versão 4.7.4.',
