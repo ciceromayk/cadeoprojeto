@@ -1,15 +1,14 @@
 // UI: controlador principal das telas
-import { $, $$, DateFilter, addWeeks, colorFromString, escapeHtml, fmtDateFull, fmtDateShort, initials, mondayOf, physicalProgress, today } from './helpers.js';
+import { $, $$, DateFilter, addWeeks, colorFromString, escapeHtml, fmtDateFull, initials, mondayOf, physicalProgress, today } from './helpers.js';
 import { friendlyError, setLoading, toast } from './feedback.js';
 import { APP_VERSION, CHANGELOG } from './changelog.js';
-import { State, validateTaskStatusChange } from './state.js';
+import { State } from './state.js';
 import { Config } from './auth.js';
 import { DB, setupRealtime } from './db.js';
 import { Perf } from './perf.js';
 import { HealthCheck } from './health.js';
 import { Modal } from './modal.js';
 import { Views } from './views.js';
-import { KanbanConfig } from './kanban-config.js';
 import { GanttCols } from './gantt-cols.js';
 import { Automation } from './automation.js';
 import { Dialog } from './dialog.js';
@@ -983,40 +982,6 @@ export const UI = {
     });
   },
 
-  bindKanbanDrag() {
-    $$('.task-card[data-task-id]').forEach(card => {
-      card.addEventListener('dragstart', (e) => { card.classList.add('dragging'); e.dataTransfer.setData('text/plain', card.dataset.taskId); });
-      card.addEventListener('dragend', () => card.classList.remove('dragging'));
-    });
-    $$('.kanban-list[data-status]').forEach(list => {
-      list.addEventListener('dragover', (e) => { e.preventDefault(); list.classList.add('drag-over'); });
-      list.addEventListener('dragleave', () => list.classList.remove('drag-over'));
-      list.addEventListener('drop', async (e) => {
-        e.preventDefault(); list.classList.remove('drag-over');
-        const taskId = e.dataTransfer.getData('text/plain');
-        const newStatus = list.dataset.status;
-        const task = State.tasks.find(t => t.id === taskId);
-        if (task && task.status !== newStatus) {
-          const _v = validateTaskStatusChange(task, newStatus);
-          if (!_v.ok) { toast(_v.message, 'error'); return; }
-          const patch = { status: newStatus };
-          if (newStatus === 'concluido' && task.progress < 100) patch.progress = 100;
-          if (newStatus === 'em_andamento' && task.progress === 0) patch.progress = 10;
-          try {
-            setLoading(true);
-            const _before = { ...task };
-            await DB.updateTask(task.id, patch);
-            Object.assign(task, patch);
-            await Automation.applyOnTaskUpdate(task.id, patch, _before);
-            await UI.render();
-            toast('Tarefa movida', 'success');
-          } catch (err) { toast(friendlyError(err), 'error'); }
-          finally { setLoading(false); }
-        }
-      });
-    });
-  },
-
   // ===== FILTRO POR INTERVALO DE DATAS (término) =====
   setDateFilter(ns, field, value) {
     const df = State.dateFilters[ns] || { from: '', to: '', preset: 'all' };
@@ -1252,185 +1217,6 @@ export const UI = {
     </body></html>`);
     w.document.close();
     w.focus();
-  },
-
-  printTasks() {
-    // Tarefas inativas e tarefas-PAI (fases) ficam fora do relatório — só as folhas de trabalho.
-    const _parentIds = new Set(State.tasks.filter(t => t.parent_id).map(t => t.parent_id));
-    const tasks = State.tasks.filter(t => !t.inactive && !_parentIds.has(t.id)).sort((a,b) => (a.end_date||'9999') > (b.end_date||'9999') ? 1 : -1);
-    const members = State.members;
-    const disciplines = State.disciplines;
-    const todayStr = today();
-    const statusBadge = {
-      a_fazer:'<span class="badge badge-todo">A Fazer</span>',
-      bloqueada:'<span class="badge badge-bloc">Bloqueada</span>',
-      em_andamento:'<span class="badge badge-prog">Em Andamento</span>',
-      concluido:'<span class="badge badge-done">Concluída</span>',
-    };
-    const prioBadge = {
-      alta:'<span class="badge badge-high">Alta</span>',
-      media:'<span class="badge badge-mid">Média</span>',
-      baixa:'<span class="badge badge-low">Baixa</span>',
-    };
-    // Etiquetas por tarefa (para coluna e filtro do preview)
-    const labelsByTask = {};
-    (State.taskLabels || []).forEach(tl => {
-      (labelsByTask[tl.task_id] = labelsByTask[tl.task_id] || []).push(tl.label_id);
-    });
-    const labelById = new Map((State.labels || []).map(l => [l.id, l]));
-    const _taskById = new Map(State.tasks.map(tk => [tk.id, tk]));
-
-    const rows = tasks.map(t => {
-      const m = members.find(x => x.id === t.assignee_id);
-      const d = disciplines.find(x => x.id === t.discipline_id);
-      const _parent = t.parent_id ? _taskById.get(t.parent_id) : null;
-      const isOvd = t.end_date && t.end_date < todayStr && t.status !== 'concluido';
-      const pct = Math.min(100, parseFloat(t.progress)||0).toFixed(0);
-      const lblIds = labelsByTask[t.id] || [];
-      const lblHtml = lblIds.map(lid => {
-        const l = labelById.get(lid);
-        return l ? `<span style="display:inline-block;font-size:8px;font-weight:700;padding:1px 5px;border-radius:6px;background:${escapeHtml(l.color)};color:#11161f;margin:0 2px 2px 0;">${escapeHtml(l.name)}</span>` : '';
-      }).join('');
-      return `<tr data-labels="${lblIds.join(',')}">
-        <td style="font-family:monospace;font-size:9px;color:#666;">${escapeHtml(t.code||'—')}</td>
-        <td><strong>${escapeHtml(t.title)}</strong>${_parent?`<br><span style="color:#E54B1A;font-size:9px;">↳ ${escapeHtml(_parent.title)}</span>`:''}${t.description?`<br><span style="color:#8a96a8;font-size:9px;">${escapeHtml(t.description.slice(0,80))}</span>`:''}</td>
-        <td>${statusBadge[t.status]||t.status}</td>
-        <td>${prioBadge[t.priority]||'—'}</td>
-        <td>${m ? escapeHtml(m.name.split(' ')[0]) : '—'}</td>
-        <td>${d ? `<span style="font-family:monospace;font-size:9px;">${d.code}</span>` : '—'}</td>
-        <td style="font-size:9px;color:#475569;">${t.sector ? escapeHtml(t.sector) : '—'}</td>
-        <td>${lblHtml || '—'}</td>
-        <td class="${isOvd?'overdue':''}">${t.end_date ? fmtDateShort(t.end_date) : '—'}</td>
-        <td><div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${t.status==='concluido'?'#059669':'#2563eb'};"></div></div><span style="font-family:monospace;font-size:9px;">${pct}%</span></div></td>
-      </tr>`;
-    }).join('');
-
-    // Filtro de etiqueta no preview (some na impressão via .no-print)
-    const labelFilter = (State.labels || []).length === 0 ? '' : `
-      <div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;">
-        <label style="font-family:monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#6B6359;">Filtrar etiqueta:</label>
-        <select id="rptLabelFilter" style="padding:5px 9px;font-size:11px;border:1px solid #ddd;border-radius:3px;background:#fff;font-family:inherit;">
-          <option value="all">Todas</option>
-          <option value="none">Sem etiqueta</option>
-          ${(State.labels || []).map(l => `<option value="${l.id}">${escapeHtml(l.name)}</option>`).join('')}
-        </select>
-        <span id="rptLabelCount" style="font-family:monospace;font-size:9px;color:#94928B;"></span>
-      </div>
-      <style>@media print { .no-print { display:none!important; } }</style>`;
-
-    const body = `
-      ${labelFilter}
-      <table id="rptTasksTable">
-        <thead><tr>
-          <th>Cód.</th><th>Tarefa</th><th>Status</th><th>Prior.</th>
-          <th>Responsável</th><th>Disc.</th><th>Setor</th><th>Etiquetas</th><th>Prazo</th><th>Progresso</th>
-        </tr></thead>
-        <tbody>${rows||'<tr><td colspan="10" style="text-align:center;color:#8a96a8;">Nenhuma tarefa</td></tr>'}</tbody>
-      </table>
-      <div style="font-size:9px;color:#8a96a8;font-family:monospace;">${tasks.length} tarefas · ${tasks.filter(t=>t.status==='concluido').length} concluídas · ${tasks.filter(t=>t.end_date&&t.end_date<todayStr&&t.status!=='concluido').length} em atraso</div>
-      <script>
-        (function(){
-          var sel = document.getElementById('rptLabelFilter');
-          if (!sel) return;
-          var rows = Array.from(document.querySelectorAll('#rptTasksTable tbody tr[data-labels]'));
-          var count = document.getElementById('rptLabelCount');
-          sel.addEventListener('change', function(){
-            var v = sel.value, shown = 0;
-            rows.forEach(function(tr){
-              var ids = (tr.dataset.labels || '').split(',').filter(Boolean);
-              var show = v === 'all' || (v === 'none' ? ids.length === 0 : ids.indexOf(v) >= 0);
-              tr.style.display = show ? '' : 'none';
-              if (show) shown++;
-            });
-            if (count) count.textContent = shown + ' de ' + rows.length + ' tarefas';
-          });
-        })();
-      <\/script>`;
-    this._printWindow('Lista de Tarefas', body);
-  },
-
-  openKanbanConfigModal() {
-    const cols = KanbanConfig.get();
-    const COLORS = ['#9ba8be','#C13B12','#E54B1A','#2E7D4F','#D4A82C','#1F3A8A','#1F3A8A','#ff9f6b'];
-
-    const renderRows = (list) => list.map((col, i) => `
-      <div class="kconfig-col-row" data-idx="${i}">
-        <span class="kconfig-col-handle" title="Arraste para reordenar">⠿</span>
-        <div class="kconfig-col-dot" style="background:${col.color};"></div>
-        <input class="form-input kconfig-name-input" value="${escapeHtml(col.label)}" data-idx="${i}"
-          style="flex:1;padding:4px 8px;font-size:13px;height:30px;" maxlength="30">
-        <select class="form-input kconfig-color-select" data-idx="${i}"
-          style="padding:4px 6px;font-size:12px;height:30px;width:90px;">
-          ${COLORS.map(c => `<option value="${c}" ${col.color === c ? 'selected' : ''} style="background:${c};color:#111;">${c}</option>`).join('')}
-        </select>
-        <button class="btn btn-ghost kconfig-del-btn" data-idx="${i}"
-          style="padding:4px 8px;color:var(--accent-danger);font-size:11px;"
-          ${list.length <= 1 ? 'disabled' : ''}>✕</button>
-      </div>`).join('');
-
-    Modal.open({ title: 'Configurar Colunas do Kanban', body: `
-      <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;">
-        Adicione, renomeie, reordene ou remova colunas. As tarefas permanecem associadas ao ID de status original.
-      </div>
-      <div id="kcolRows">${renderRows(cols)}</div>
-      <button class="kconfig-add-btn" id="kcolAddBtn">+ Adicionar coluna</button>
-      <div style="display:flex;gap:8px;margin-top:18px;justify-content:flex-end;">
-        <button class="btn btn-ghost" id="kcolResetBtn">Restaurar padrão</button>
-        <button class="btn" id="kcolSaveBtn" style="background:var(--accent);color:var(--bg-deep);font-weight:700;">Salvar</button>
-      </div>
-    ` });
-
-    let current = JSON.parse(JSON.stringify(cols));
-
-    const refresh = () => {
-      document.getElementById('kcolRows').innerHTML = renderRows(current);
-      bindInputs();
-    };
-
-    const bindInputs = () => {
-      document.querySelectorAll('.kconfig-name-input').forEach(inp => {
-        inp.oninput = (e) => { current[+e.target.dataset.idx].label = e.target.value; };
-      });
-      document.querySelectorAll('.kconfig-color-select').forEach(sel => {
-        sel.onchange = (e) => {
-          current[+e.target.dataset.idx].color = e.target.value;
-          document.querySelectorAll('.kconfig-col-dot')[+e.target.dataset.idx].style.background = e.target.value;
-        };
-      });
-      document.querySelectorAll('.kconfig-del-btn').forEach(btn => {
-        btn.onclick = (e) => {
-          const idx = +e.target.dataset.idx;
-          current.splice(idx, 1);
-          refresh();
-        };
-      });
-    };
-
-    bindInputs();
-
-    document.getElementById('kcolAddBtn').onclick = () => {
-      const usedColors = current.map(c => c.color);
-      const nextColor = COLORS.find(c => !usedColors.includes(c)) || COLORS[0];
-      const newId = 'col_' + Date.now();
-      current.push({ id: newId, label: 'Nova Coluna', color: nextColor });
-      refresh();
-    };
-
-    document.getElementById('kcolResetBtn').onclick = async () => {
-      if (!await Dialog.confirm({ title: 'Restaurar padrão', msg: 'Restaurar as colunas padrão do Kanban?\n\nColunas personalizadas serão removidas.', confirmText: 'Restaurar' })) return;
-      KanbanConfig.reset();
-      Modal.close();
-      UI.render();
-    };
-
-    document.getElementById('kcolSaveBtn').onclick = () => {
-      const valid = current.filter(c => c.label.trim());
-      if (!valid.length) { toast('Adicione pelo menos uma coluna', 'warning'); return; }
-      KanbanConfig.set(valid);
-      Modal.close();
-      UI.render();
-      toast('Colunas salvas', 'success');
-    };
   },
 
 };

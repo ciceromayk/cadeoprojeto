@@ -20,6 +20,7 @@ import './screen-eap.js';
 import './screen-import-export.js';
 import './screen-task-modal.js';
 import './screen-gantt.js';
+import './screen-tasks.js';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { $, $$, _parseYMD, addDays, addWorkingDays, daysBetween, escapeHtml, forecastEndDate, isWorkingDay, parentTag, parentTitleOf, physicalProgress, today, workingDaysBetween } from './helpers.js';
 import { autoSchedule, computeCriticalPath } from './cpm.js';
